@@ -1,13 +1,22 @@
-<header class="site-header">
+<header class="site-header" role="banner">
   <div class="container">
-    <nav class="nav nav--stack">
+    <nav class="nav" aria-label="Primary">
       <a class="nav__brand" href="index.html">Hopkinton Fire Department</a>
-      <ul class="nav__links">
+
+      <!-- Hamburger toggle (shown on small screens) -->
+      <button class="nav__toggle" aria-expanded="false" aria-controls="primary-nav" aria-label="Menu">
+        <span class="nav__toggle-bar"></span>
+        <span class="nav__toggle-bar"></span>
+        <span class="nav__toggle-bar"></span>
+      </button>
+
+      <!-- Main navigation -->
+      <ul id="primary-nav" class="nav__links">
         <li><a href="index.html">Home</a></li>
         <li><a href="apparatus.html">Apparatus</a></li>
         <li><a href="maps.html">Maps</a></li>
         <li><a href="run-cards.html">Run Cards</a></li>
-        <li><a href="preplans.html">Pre-Fire Plans</a></li>        
+        <li><a href="preplans.html">Pre-Fire Plans</a></li>
         <li><a href="erg.html">ERG</a></li>
         <li><a href="ems.html">EMS</a></li>
         <li><a href="administrative.html">Administrative</a></li>
@@ -16,4 +25,67 @@
       </ul>
     </nav>
   </div>
+
+  <!-- Minimal, scoped CSS for hamburger behavior; uses your existing typography/colors -->
+  <style>
+    /* Button is hidden on desktop by default */
+    .nav__toggle {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      width: 40px; height: 40px;
+      padding: 6px 8px;
+      border: none; background: transparent;
+      color: inherit; cursor: pointer;
+    }
+    .nav__toggle-bar {
+      display: block; width: 100%; height: 2px;
+      background: currentColor; border-radius: 2px;
+      transition: transform .2s ease, opacity .2s ease;
+    }
+
+    /* Mobile: collapse links, show button */
+    @media (max-width: 900px) {
+      .site-header .nav__links {
+        display: none;          /* hide until opened */
+        flex-direction: column; /* vertical list when open */
+        gap: 8px;
+        margin-top: 6px;
+      }
+      .nav__toggle { display: inline-flex; }
+      .site-header.menu-open .nav__links { display: flex; }
+
+      /* animated X for the hamburger */
+      .site-header.menu-open .nav__toggle-bar:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+      .site-header.menu-open .nav__toggle-bar:nth-child(2) { opacity: 0; }
+      .site-header.menu-open .nav__toggle-bar:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+    }
+
+    /* Desktop: ensure links are visible inline as your CSS defines */
+    @media (min-width: 901px) {
+      .site-header .nav__links { display: flex; }
+      .nav__toggle { display: none; }
+    }
+  </style>
+
+  <!-- Tiny behavior: toggles .menu-open on the header -->
+  <script>
+    (function () {
+      var root = document.currentScript.closest('.site-header');
+      var btn  = root && root.querySelector('.nav__toggle');
+      var menu = root && root.querySelector('#primary-nav');
+      if (!root || !btn || !menu) return;
+
+      function closeMenu(){ root.classList.remove('menu-open'); btn.setAttribute('aria-expanded','false'); }
+      function toggleMenu(){
+        var open = root.classList.toggle('menu-open');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+
+      btn.addEventListener('click', toggleMenu);
+      menu.addEventListener('click', function(e){ if (e.target.tagName === 'A') closeMenu(); });
+      window.addEventListener('resize', function(){ if (matchMedia('(min-width:900px)').matches) closeMenu(); });
+    })();
+  </script>
 </header>
