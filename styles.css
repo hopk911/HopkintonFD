@@ -455,3 +455,22 @@ footer a, .site-footer a {
   text-decoration: none;
 }
 
+
+
+/* Make all grid/tile/card images scale and crop nicely */
+.grid img, [class*="grid"] img, .tile img, .card img {
+  width: 100%;
+  height: auto;            /* fallback if aspect-ratio not supported */
+  aspect-ratio: 4 / 3;     /* consistent thumb shape */
+  object-fit: cover;       /* crop instead of stretching */
+  display: block;
+}
+
+/* 2-up grid on small screens so tiles aren't gigantic */
+@media (max-width: 600px) {
+  .grid { 
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
