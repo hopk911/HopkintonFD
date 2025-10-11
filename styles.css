@@ -151,7 +151,7 @@ img { max-width: 100%; height: auto; display: block; }
 /* Table: row 2, column 2 */
 .comp-content > .info-table { grid-column: 2; }
 
-/* Photo: row 2, column 1 — aligns with top of the table */
+/* Photo: row 2, column 1 â€” aligns with top of the table */
 .comp-photo {
   margin-top: 0;
   grid-column: 1;
@@ -173,15 +173,12 @@ img { max-width: 100%; height: auto; display: block; }
 }
 
 /* Mobile: stack everything naturally */
-  @media (max-width: 900px) {
-.comp-content { display: block; }
+  .comp-content { display: block; }
   .comp-content > .section-title,
   .comp-content > .info-table,
   .comp-photo { grid-column: 1 / -1; grid-row: auto; }
 
 
-
-}
 /* ========== Tables ========== */
 .info-table { width: 100%; border-collapse: collapse; }
 .info-table td, .info-table th { padding: 8px 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
@@ -297,7 +294,7 @@ img { max-width: 100%; height: auto; display: block; }
 
 /* === O5: tighten vertical spacing above "Chimney Bucket" === */
 #O5 .comp-layout { row-gap: 8px; }             /* reduce default gap (was 20px) */
-#O5 .info-table { margin-top: 0; }             /* ensure tables don’t add extra top margin */
+#O5 .info-table { margin-top: 0; }             /* ensure tables donâ€™t add extra top margin */
 #O5 .comp-photo { margin-top: 0; }             /* already zeroed, keep explicit */
 
 /* === O5 section title spacing fix === */
@@ -454,7 +451,6 @@ footer a, .site-footer a {
   color: #fff !important;
   text-decoration: none;
 }
-
 
 
 /* Make all grid/tile/card images scale and crop nicely */
