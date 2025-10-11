@@ -173,11 +173,12 @@ img { max-width: 100%; height: auto; display: block; }
 }
 
 /* Mobile: stack everything naturally */
+@media (max-width: 900px) {
   .comp-content { display: block; }
   .comp-content > .section-title,
   .comp-content > .info-table,
   .comp-photo { grid-column: 1 / -1; grid-row: auto; }
-
+}
 
 /* ========== Tables ========== */
 .info-table { width: 100%; border-collapse: collapse; }
