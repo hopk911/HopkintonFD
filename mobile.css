@@ -1,0 +1,13 @@
+/* Minimal mobile.css to ensure sane scaling if original 404s */
+:root { --container: min(1100px, 92vw); }
+html, body { margin:0; padding:0; }
+.container { width: var(--container); margin: 0 auto; }
+
+/* Typography clamps to avoid massive headings on phones */
+h1 { font-size: clamp(1.4rem, 4.5vw, 2.4rem); line-height: 1.2; margin: 0.8rem 0 0.6rem; }
+h2 { font-size: clamp(1.2rem, 4vw, 1.8rem); line-height: 1.3; margin: 0.8rem 0 0.6rem; }
+p, li, td, th { font-size: clamp(0.95rem, 3.7vw, 1.05rem); line-height: 1.45; }
+
+/* Tables: let them scroll on small screens */
+table { width: 100%; border-collapse: collapse; }
+.table-wrap { overflow-x:auto; -webkit-overflow-scrolling: touch; }
