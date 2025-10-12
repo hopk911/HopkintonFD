@@ -1,16 +1,19 @@
 (function(){
-  async function loadHeaderInto(placeholder){
-    try {
-      const res = await fetch('/partials/header.html', { cache: 'no-cache' });
-      if (!res.ok) throw new Error('Failed to load header.html');
-      const html = await res.text();
-      placeholder.innerHTML = html;
-
-      const header = placeholder.querySelector('.site-header');
-      bindHamburger(header);
-    } catch (e) {
-      console.error('[include-header] ', e);
+  async function fetchWithFallbacks(urls){
+    for (const u of urls){
+      try {
+        const res = await fetch(u, {cache:'no-cache'});
+        if (res.ok) return res.text();
+      } catch(_) {}
     }
+    throw new Error('Failed to load header from: ' + urls.join(', '));
+  }
+
+  function resolveHeaderSrc(placeholder){
+    const attr = placeholder.getAttribute('data-src');
+    if (attr && attr.trim()) return [attr.trim()];
+    // Try common locations relative to the page
+    return ['header.html', '../header.html', '/header.html', '/partials/header.html'];
   }
 
   function bindHamburger(header){
@@ -21,30 +24,35 @@
     const menu = header.querySelector('#primary-nav');
     if (!btn || !menu) return;
 
-    function open(){ header.classList.add('menu-open'); btn.setAttribute('aria-expanded','true'); }
     function close(){ header.classList.remove('menu-open'); btn.setAttribute('aria-expanded','false'); }
-    function toggle(){ header.classList.toggle('menu-open'); btn.setAttribute('aria-expanded', header.classList.contains('menu-open') ? 'true' : 'false'); }
-
+    function toggle(){
+      const open = header.classList.toggle('menu-open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
     btn.addEventListener('click', toggle);
-    menu.addEventListener('click', function(e){ if (e.target.tagName === 'A') close(); });
-    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
-    window.addEventListener('resize', function(){ if (matchMedia('(min-width:900px)').matches) close(); });
-    document.addEventListener('click', function(e){
-      if (!header.contains(e.target) && header.classList.contains('menu-open')) close();
-    });
+    menu.addEventListener('click', e => { if (e.target.tagName === 'A') close(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    window.addEventListener('resize', () => { if (matchMedia('(min-width:900px)').matches) close(); });
+    document.addEventListener('click', e => { if (!header.contains(e.target)) close(); });
   }
 
-  // Auto-run on DOM ready
+  async function loadHeaderInto(placeholder){
+    try {
+      const candidates = resolveHeaderSrc(placeholder);
+      const html = await fetchWithFallbacks(candidates);
+      placeholder.innerHTML = html;
+      bindHamburger(placeholder.querySelector('.site-header'));
+    } catch (e){
+      console.error('[include-header] Error:', e);
+    }
+  }
+
   function init(){
     document.querySelectorAll('#header-placeholder').forEach(loadHeaderInto);
   }
-  if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 
-  // Expose hooks (optional)
-  window.__bindHamburger = bindHamburger;
-  window.__loadHeaderInto = loadHeaderInto;
+  // expose (optional)
+  window.__includeHeader = { loadHeaderInto, bindHamburger };
 })();
