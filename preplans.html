@@ -505,10 +505,10 @@
 				{ columns: 3, groups: [
 					{ title: 'Tanks', fields: ['Tanks:','Tanks Photo:'] },
 					{ title: 'Combustibles', fields: ['Combustibles:'] },
-					{ title: 'Gas', fields: ['Gas:'] }
-				]},
-				{ columns: 2, groups: [
 					{ title: 'Hazardous Materials', fields: ['Haz-Mat:'] },
+
+				]},
+				{ columns: 1, groups: [
 					{ title: 'Other', fields: ['Other Notes:'] }
 				]}
 				];
@@ -599,7 +599,7 @@
 								hdr.textContent = group.title;
 								card.appendChild(hdr);
 							}
-
+							
 							const body = document.createElement('div');
 							body.className = 'card__body';
 							const dl = document.createElement('dl');
@@ -614,6 +614,53 @@
 								dl.appendChild(dt);
 								dl.appendChild(dd);
 							});
+							
+							// Color themes by group title
+							const title = (group.title || '').toLowerCase();
+							
+							
+							if (title === 'water') {
+							  card.style.background = '#eff6ff';   // light blue body
+							  card.style.borderColor = '#bfdbfe';
+							  const hdrEl = card.querySelector('.card__hdr');
+							  if (hdrEl) hdrEl.style.background = '#dbeafe'; // blue header
+							}
+							
+							if (title === 'sprinkler') {
+							  card.style.background = '#fef2f2';   // light red body
+							  card.style.borderColor = '#fecaca';
+							  const hdrEl = card.querySelector('.card__hdr');
+							  if (hdrEl) hdrEl.style.background = '#fee2e2'; // red header
+							}
+							
+							if (title === 'hazardous materials') {
+							  card.style.background  = '#ffedd5';   // medium orange body
+							  card.style.borderColor = '#fb923c';   // strong border
+							  const hdrEl = card.querySelector('.card__hdr');
+							  if (hdrEl) hdrEl.style.background = '#f97316'; // dark orange header
+							}
+							
+							if (title === 'gas') {
+							  card.style.background = '#fefce8';   // light yellow body
+							  card.style.borderColor = '#fde68a';
+							  const hdrEl = card.querySelector('.card__hdr');
+							  if (hdrEl) hdrEl.style.background = '#fef9c3'; // pale yellow header
+							}
+							
+							if (title === 'electrical') {
+							  card.style.background = '#f0fdf4';   // light green body
+							  card.style.borderColor = '#bbf7d0';
+							  const hdrEl = card.querySelector('.card__hdr');
+							  if (hdrEl) hdrEl.style.background = '#dcfce7'; // green header
+							}
+							
+							if (title === 'alarm') {
+							  card.style.background = '#fee2e2';   // darker red body
+							  card.style.borderColor = '#fca5a5';
+							  const hdrEl = card.querySelector('.card__hdr');
+							  if (hdrEl) hdrEl.style.background = '#ef4444'; // deep red header
+							}
+
 
 							body.appendChild(dl);
 							card.appendChild(body);
