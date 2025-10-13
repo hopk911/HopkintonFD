@@ -494,13 +494,14 @@
 				]},
 				{ columns: 3, groups: [
 					{ title: 'Alarm', fields: ['Alarm Type:','Alarm Location:','Remote Alarm Location:','Alarm Notes:'] },
-					{ title: 'Gas', fields: ['Gas Shutoff Location:','Gas Shutoff Photo:'] },
-					{ title: 'Electrical', fields: ['Electrical Shutoff Location:','Electrical Shutoff Photo:'] }
+					{ title: 'Sprinkler', fields: ['Sprinkler Main Shutoff Location:','Sprinkler Shutoff Photo:'] },
+					{ title: 'Fire Pump', fields: ['Fire Pump Location:'] }
+
 				]},
 				{ columns: 3, groups: [
 					{ title: 'Water', fields: ['Water Shutoff Location:','Water Shutoff Photo:'] },
-					{ title: 'Sprinkler', fields: ['Sprinkler Main Shutoff Location:','Sprinkler Shutoff Photo:'] },
-					{ title: 'Fire Pump', fields: ['Fire Pump Location:'] }
+					{ title: 'Gas', fields: ['Gas Shutoff Location:','Gas Shutoff Photo:'] },
+					{ title: 'Electrical', fields: ['Electrical Shutoff Location:','Electrical Shutoff Photo:'] }
 				]},
 				{ columns: 3, groups: [
 					{ title: 'Tanks', fields: ['Tanks:','Tanks Photo:'] },
@@ -633,6 +634,13 @@
 							  if (hdrEl) hdrEl.style.background = '#fee2e2'; // red header
 							}
 							
+							if (title === 'fire pump') {
+							  card.style.background = '#fef2f2';   // light red body
+							  card.style.borderColor = '#fecaca';
+							  const hdrEl = card.querySelector('.card__hdr');
+							  if (hdrEl) hdrEl.style.background = '#fee2e2'; // red header
+							}
+							
 							if (title === 'hazardous materials') {
 							  card.style.background  = '#ffedd5';   // medium orange body
 							  card.style.borderColor = '#fb923c';   // strong border
@@ -655,12 +663,32 @@
 							}
 							
 							if (title === 'alarm') {
-							  card.style.background = '#fee2e2';   // darker red body
-							  card.style.borderColor = '#fca5a5';
+							  card.style.background  = '#b91c1c';   // dark red body
+							  card.style.borderColor = '#7f1d1d';   // deep border
 							  const hdrEl = card.querySelector('.card__hdr');
-							  if (hdrEl) hdrEl.style.background = '#ef4444'; // deep red header
+							  if (hdrEl) hdrEl.style.background = '#ef4444'; // lighter red header
 							}
 
+							if (title === 'other') {
+							  card.style.background  = '#ccfbf1';   // light teal body
+							  card.style.borderColor = '#5eead4';   // medium teal border
+							  const hdrEl = card.querySelector('.card__hdr');
+							  if (hdrEl) hdrEl.style.background = '#14b8a6'; // darker teal header
+							}
+							
+							if (title === 'tanks') {
+							  card.style.background  = '#f3f4f6';   // light gray body
+							  card.style.borderColor = '#d1d5db';   // medium gray border
+							  const hdrEl = card.querySelector('.card__hdr');
+							  if (hdrEl) hdrEl.style.background = '#6b7280'; // dark gray header
+							}
+
+							if (title === 'combustibles') {
+							  card.style.background  = '#f5f3ff';   // very light purple body
+							  card.style.borderColor = '#ddd6fe';   // soft lavender border
+							  const hdrEl = card.querySelector('.card__hdr');
+							  if (hdrEl) hdrEl.style.background = '#a78bfa'; // medium purple header
+							}
 
 							body.appendChild(dl);
 							card.appendChild(body);
