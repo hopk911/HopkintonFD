@@ -1,644 +1,311 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Hopkinton MA Property Lookup (Leaflet + Esri)</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Hopkinton Property Lookup (Hardcoded Sheet)</title>
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Esri Leaflet (ArcGIS Feature Services in Leaflet) -->
-  <script src="https://unpkg.com/esri-leaflet@3.0.11/dist/esri-leaflet.js"></script>
+<script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
 
-  <!-- Esri Leaflet Geocoder (address search) -->
-  <link rel="stylesheet" href="https://unpkg.com/esri-leaflet-geocoder@3.1.4/dist/esri-leaflet-geocoder.css" />
-  <script src="https://unpkg.com/esri-leaflet-geocoder@3.1.4/dist/esri-leaflet-geocoder.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/esri-leaflet-geocoder@3.1.4/dist/esri-leaflet-geocoder.css"/>
+<script src="https://unpkg.com/esri-leaflet-geocoder@3.1.4/dist/esri-leaflet-geocoder.js"></script>
 
-  <style>
-    :root{
-      --bg:#0b1220; --panel:#111827; --muted:#94a3b8; --text:#e5e7eb; --accent:#60a5fa;
-    }
-    * { box-sizing: border-box; }
-    html, body { height:100%; margin:0; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; }
-    header {
-      position: sticky; top:0; z-index: 1000;
-      background: rgba(17,24,39,.85); backdrop-filter: saturate(160%) blur(6px);
-      border-bottom: 1px solid #1f2937;
-    }
-    .wrap { max-width: 1200px; margin: 0 auto; padding: 12px 16px; display: grid; gap: 10px; grid-template-columns: 1fr auto; align-items: center; }
-    .badge { font-size:12px; color:var(--muted); }
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-    #app { height: calc(100% - 54px); display: grid; grid-template-columns: 1fr 360px; }
-    #map { width:100%; height: calc(100% - 24px); margin:12px; }
-    aside {
-      height:100%; overflow:auto; background:var(--panel); border-left:1px solid #1f2937;
-      padding:14px; display:flex; flex-direction: column; gap:12px;
-    }
-    aside h2 { margin:0 0 6px; font-size:16px; font-weight:700; }
-    .hint { color:var(--muted); font-size:13px; }
-    .kv { width:100%; border-collapse: collapse; }
-    .kv th, .kv td { border-bottom:1px solid #1f2937; padding:8px 6px; font-size:13px; vertical-align: top; }
-    .kv th { color:#cbd5e1; text-align:left; width:38%; }
-    .kv td { color:#e5e7eb; word-break: break-word; }
-    .pill { display:inline-block; padding:2px 8px; border-radius:12px; font-size:12px; border:1px solid #334155; color:#cbd5e1; }
-    .legend { font-size:12px; color:#cbd5e1; display:flex; gap:8px; align-items:center; }
-    .swatch{ width:14px; height:14px; border-radius:3px; display:inline-block; border:1px solid rgba(0,0,0,.35); }
-    .parcel-stroke { background:#93c5fd; } /* outline */
-    .parcel-fill { background:rgba(96,165,250,.25); }
-
-    .leaflet-container { background:#0b1220; }
-    .leaflet-popup-content { color:#111827; }
-
-    @media (max-width: 980px){
-      #app { grid-template-columns: 1fr; grid-template-rows: 60% 40%; }
-      aside { border-left:none; border-top:1px solid #1f2937; }
-    }
-    .photos-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap:10px; }
-  .photos-grid a{ display:block; border:1px solid #1f2937; border-radius:10px; overflow:hidden; background:#0f172a; }
-  .photos-grid img{ width:100%; height:100%; aspect-ratio: 1 / 1; object-fit: cover; display:block; }
-
-/* Failsafe map sizing */
-html, body { height:100%; }
-#map { min-height: 60vh; }
-.leaflet-container { background:#0b1220; }
-
-  .kv td img{ max-width: 100%; height: auto; display:block; }
+<style>
+:root{--bg:#0b1220;--panel:#0f172a;--text:#e5e7eb;--muted:#94a3b8;--line:#1f2937;}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+header{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1px solid var(--line)}
+.bar{max-width:1300px;margin:0 auto;padding:10px 14px;display:grid;grid-template-columns:1fr auto;gap:10px}
+.controls{display:flex;gap:8px;align-items:center}
+.controls input{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0b1220;color:#e5e7eb;min-width:260px}
+.controls button{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0b1220;color:#e5e7eb;cursor:pointer}
+main{display:grid;grid-template-columns:1fr 420px;height:calc(100% - 60px)}
+#map{position:relative;margin:12px;border-radius:12px;overflow:hidden}
+aside{border-left:1px solid var(--line);padding:14px;overflow:auto}
+h2{margin:6px 0 8px;font-size:18px}
+.hint{color:var(--muted);min-height:1.2em}
+.summary .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:#cbd5e1}
+table.kv{width:100%;border-collapse:collapse;margin-top:6px}
+.kv th,.kv td{padding:10px 8px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+.kv th{color:#cbd5e1;font-weight:600;width:40%}
+.kv td{color:#e5e7eb}
+.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.photos a{display:block;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.photos img{width:100%;height:100%;object-fit:cover;display:block}
+.small{color:#93a0b5;font-size:12px}
 </style>
-  <!-- PapaParse for CSV parsing -->
-  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
 <body>
 <header>
-  <div class="wrap">
-<div class="controls" style="display:flex; gap:8px; flex-wrap:wrap;">
-  <input id="addrInput" type="text" placeholder="Search address…" style="flex:1; min-width:280px; padding:8px 12px; border-radius:10px; border:1px solid #1f2937; background:#0f172a; color:#e5e7eb;" />
-  <button id="addrBtn" style="padding:8px 12px; border-radius:10px; border:1px solid #1f2937; background:#0f172a; color:#e5e7eb; cursor:pointer;">Search</button>
-</div>
-
-    
-
+  <div class="bar">
+    <div class="controls">
+      <input id="addrInput" placeholder="Search address (e.g., 73 Main Street)"/>
+      <button id="addrBtn">Search</button>
+      <span id="status" class="hint"></span>
+    </div>
+    <div class="controls"><span class="small">Hopkinton parcels + preplans</span></div>
   </div>
 </header>
 
-<main id="app">
+<main>
   <div id="map"></div>
   <aside>
     <h2>Property Info</h2>
-    <div id="status" class="hint">Click a parcel to view its attributes, or use the address search on the map.</div>
-    <div id="summary"></div>
-    <table id="attrs" class="kv" style="display:none;"></table>
-<div id="sheetStatus" class="hint">Optional: paste a CSV link above to enable lookup by Map/Parcel ID.</div>
-<table id="sheetTable" class="kv" style="display:none;"></table>
+    <div id="summary" class="summary"></div>
+    <table id="attrs" class="kv"></table>
+
+    <h2 style="margin-top:14px;">Preplans (Google Sheet)</h2>
+    <div id="sheetStatus" class="small">Loading…</div>
+    <table id="sheetTable" class="kv"></table>
+    <div id="sheetPhotos" class="photos"></div>
   </aside>
 </main>
 
 <script>
-window.addEventListener("DOMContentLoaded", function(){
-  try {
-(function(){
-  const HOP = [42.228, -71.523]; // Hopkinton center-ish
-  const FS_URL = "https://services1.arcgis.com/hGdibHYSPO59RG1h/ArcGIS/rest/services/L3_TAXPAR_POLY_ASSESS_gdb/FeatureServer/0";
+// === Config ===
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbw03c7Rrm_7oweQJUiprYdF5FXDzRRiYO3WjI97Nezq-D1GOQ69UPzRZNibGai7WL52Rg/exec";
+const FS_URL = "https://services1.arcgis.com/hGdibHYSPO59RG1h/ArcGIS/rest/services/L3_TAXPAR_POLY_ASSESS_gdb/FeatureServer/0";
+const HOP = [42.228, -71.523];
 
-  // Map & basemap
-  if(!window.L){ throw new Error('Leaflet not loaded'); }
-  const map = L.map('map', { zoomControl:true }).setView(HOP, 13);
+// === Map ===
+const map = L.map('map',{zoomControl:true}).setView(HOP,13);
 window.map = map;
-  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20, attribution:'&copy; OpenStreetMap' });
-  osm.on('tileerror', (e)=>{ console.warn('Tile error', e); });
-  osm.addTo(map);
-  setTimeout(()=>{ map.invalidateSize(); }, 120);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap'}).addTo(map);
+setTimeout(()=>map.invalidateSize(),120);
 
-  // Address search
-  const search = L.esri.Geocoding.geosearch({ position:'topleft', placeholder:'Search address…' }).addTo(map);
-  const searchResults = L.layerGroup().addTo(map);
-  search.on('results', (e)=>{
-    searchResults.clearLayers();
-    if(e.results[0]){
-      searchResults.addLayer(L.marker(e.results[0].latlng));
-      map.setView(e.results[0].latlng, 17);
-    }
-  });
+// Parcels
+const parcelLayer = L.esri.featureLayer({
+  url:FS_URL, where:"TOWN_ID=139", simplifyFactor:0.2, precision:6,
+  style:{color:'#60a5fa',weight:1,fillOpacity:0.05}
+}).addTo(map);
 
-  // UI refs
-  const statusEl = document.getElementById('status');
-  const summaryEl = document.getElementById('summary');
-  const attrsTable = document.getElementById('attrs');
+// UI refs
+const statusEl=document.getElementById('status');
+const summaryEl=document.getElementById('summary');
+const attrsTable=document.getElementById('attrs');
+const sheetStatus=document.getElementById('sheetStatus');
+const sheetTable=document.getElementById('sheetTable');
+const sheetPhotos=document.getElementById('sheetPhotos');
+const addrInput=document.getElementById('addrInput');
+const addrBtn=document.getElementById('addrBtn');
+function setStatus(t){ if(statusEl) statusEl.textContent=t||''; }
 
-  function setStatus(t){ try{ statusEl.textContent = t; }catch(e){} }
+// === Sheet model ===
+const sheet = { url:SHEET_URL, ready:false, headers:[], index:new Map() };
+const normalizeKey = v => String(v||'').toUpperCase().replace(/\s+/g,' ').trim();
 
-function styleSelected(){ return { color:'#93c5fd', weight:3, fillColor:'#60a5fa', fillOpacity:0.25 }; }
+function driveThumb(url){
+  try{
+    const u=new URL(url);
+    const id=u.searchParams.get('id')||(u.hostname.includes('drive.google.com')?(url.match(/\/file\/d\/([^/]+)/)||[])[1]:null);
+    return id?`https://drive.google.com/thumbnail?id=${id}&sz=w480`:null;
+  }catch{return null;}
+}
 
-  function extractDriveId(url){
-    // Supports https://drive.google.com/file/d/<ID>/view?... and open?id=<ID>
-    try{
-      const u = new URL(url);
-      if(u.hostname.includes('drive.google.com')){
-        const m = url.match(/\/file\/d\/([^\/]+)\//);
-        if(m) return m[1];
-        if(u.searchParams.get('id')) return u.searchParams.get('id');
-      }
-    }catch{}
-    return null;
-  }
-  function driveThumb(id, size){ return `https://drive.google.com/thumbnail?id=${id}&sz=w${size||320}`; }
-  function toImageSrc(url){
-    if(!url) return null;
-    url = String(url).trim();
-    // Don't return a direct Drive 'uc?' src here to avoid CORS from file:// origin
-    if(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(url)) return url;
-    return null;
-  }
-  function looksLikeUrl(v){
-    return /^https?:\/\//i.test(String(v||''));
-  }
+// Render sheet row in header order
+function renderSheetRow(row){
+  sheetTable.innerHTML=''; sheetPhotos.innerHTML='';
+  const headers = sheet.headers.length? sheet.headers : Object.keys(row);
+  headers.forEach(h=>{
+    if(!(h in row)) return;
+    const val = row[h];
+    if(val==null || String(val).trim()==='') return;
+    const cell = String(val).trim();
 
-
-
-  // Render only requested fields + merge sheet info by first-column key
-  function renderAttributes(a){
-    const pick = (obj, keys) => {
-      for(const k of keys){ if(obj && obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== '') return obj[k]; }
-      return null;
-    };
-    const siteAddr = pick(a, ['SITE_ADDR','SITUSADDR','ADDRESS','FULL_STR','LOCATION','SITE_ADDRESS']);
-    const city     = pick(a, ['CITY','MUNIC','TOWN','CITY_NAME']);
-    const zip      = pick(a, ['ZIP','ZIPCODE','ZIP_CODE','POSTCODE']);
-    const zoning   = pick(a, ['ZONING','ZONE','ZONING_CODE','ZONE_CODE']);
-    const mappar   = pick(a, ['MAP_PAR_ID','LOC_ID','MAP_PAR','PARCELID','MAP_LOT','PID','MAP_PAR_ID_NO']);
-    const stories  = pick(a, ['STORIES','STORY_NO','NO_STORY']);
-    const units    = pick(a, ['UNITS','NUM_UNITS','UNIT_COUNT']);
-    const style    = pick(a, ['STYLE','BLDG_STYLE','HOUSE_STYLE']);
-
-    const pills = [];
-    if (mappar) pills.push(`<span class="pill">${mappar}</span>`);
-    summaryEl.innerHTML = `
-      ${siteAddr ? `<div><strong>${siteAddr}</strong></div>` : ''}
-      ${(city||zip) ? `<div style="color:#cbd5e1">${[city, zip].filter(Boolean).join(' ')}</div>` : ''}
-      ${pills.length ? `<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">${pills.join('')}</div>` : ''}
-    `;
-
-    const rows = [
-      ['Site Address', siteAddr],
-      ['City', city],
-      ['Zip', zip],
-      ['Zoning', zoning],
-      ['Map/Parcel ID', mappar],
-      ['Stories', stories],
-      ['Units', units],
-      ['Style', style],
-    ];
-    attrsTable.style.display = 'table';
-    attrsTable.innerHTML = '';
-    for(const [label, val] of rows){
-      const tr = document.createElement('tr');
-      const th = document.createElement('th'); th.textContent = label;
-      const td = document.createElement('td'); td.textContent = (val!=null && String(val).trim()!=='') ? String(val) : '—';
-      tr.appendChild(th); tr.appendChild(td);
-      attrsTable.appendChild(tr);
-    }
-
-    // Merge Google Sheet row (first column is the key)
-    const sheetStatus = document.getElementById('sheetStatus');
-    const sheetTable = document.getElementById('sheetTable');
-    // photosEl defined above
-    if(sheet && sheet.ready && mappar){
-      const key = String(mappar).trim().toUpperCase();
-      const row = sheet.index.get(key);
-      if(row){
-        const entries = Object.entries(row).filter(([k]) => k !== sheet.keyCol);
-        if(entries.length){
-          sheetTable.style.display = 'table';
-          sheetTable.innerHTML = '';
-          
-
-
-
-// Universal inline-media rendering: render thumbnails for any column that looks like photos/links.
-const photoHeaderRegex = /(photo|image|img|picture|pic|url|link)/i;
-
-for (const [k, v] of entries){
-  const tr2 = document.createElement('tr');
-  const th2 = document.createElement('th'); th2.textContent = k;
-  const td2 = document.createElement('td');
-
-  let rendered = false;
-  const isPhotoishHeader = k && photoHeaderRegex.test(String(k));
-
-  if (v != null && String(v).trim() !== ''){
-    const text = String(v);
-    const looksLikeUrl = /https?:\/\//i.test(text);
-    const parts = text.split(',').map(s=>s.trim()).filter(Boolean);
-    // If header hints "photo" OR cell contains URLs → try thumbnails
-    if (isPhotoishHeader || looksLikeUrl){
-      const imgs = [];
-      for (const part of parts){
-        const a = document.createElement('a'); a.href = part; a.target = '_blank'; a.rel = 'noopener';
-        let src = null;
-        const id = extractDriveId(part);
-        if (id){
-          // Prefer Drive thumbnail to avoid CORS under file:// ; fall back to uc? view
-          src = driveThumb(id, 480);
-        } else {
-          src = toImageSrc(part);
-        }
-        if (!src && id){ src = `https://drive.google.com/uc?export=view&id=${id}`; }
-        if (src){
-          const img = document.createElement('img');
-          img.alt = k; img.style.maxWidth='220px'; img.style.height='auto';
-          img.style.borderRadius='10px'; img.style.display='block'; img.loading='lazy';
-          img.src = src;
-          img.onerror = ()=>{ try{ a.textContent = String(part); a.removeChild(img); }catch{} };
+    if (/(photo|image|img|picture|pic|url|link)/i.test(h) || /^https?:\/\//i.test(cell)){
+      const parts = cell.split(',').map(s=>s.trim()).filter(Boolean);
+      parts.forEach(part=>{
+        const a=document.createElement('a'); a.href=part; a.target='_blank'; a.rel='noopener';
+        let src = driveThumb(part);
+        if(!src && /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(part)) src = part;
+        if(src){
+          const img=document.createElement('img');
+          img.src=src; img.alt=h; img.loading='lazy';
           a.appendChild(img);
-          imgs.push(a);
-        }
-      }
-      if (imgs.length){
-        const wrap = document.createElement('div'); wrap.style.display='flex'; wrap.style.flexWrap='wrap'; wrap.style.gap='10px';
-        for (const a of imgs) wrap.appendChild(a);
-        td2.appendChild(wrap);
-        rendered = true;
-      }
-    }
-  }
-
-  if (!rendered){
-    td2.textContent = (v != null && String(v).trim() !== '') ? String(v) : '—';
-  }
-
-  tr2.appendChild(th2); tr2.appendChild(td2);
-  sheetTable.appendChild(tr2);
-}
-
-
-
-
-          sheetStatus.textContent = '';
+          const wrap=document.createElement('div');
+          wrap.style.border='1px solid var(--line)'; wrap.style.borderRadius='8px'; wrap.style.overflow='hidden';
+          wrap.appendChild(a); sheetPhotos.appendChild(wrap);
         }else{
-          // Build photo thumbnails from any cells that look like URLs (or comma-separated URLs)
-          // photosEl defined above
-          const photoUrls = [];
-          
-for (const [k, v] of entries){
-  const tr2 = document.createElement('tr');
-  const th2 = document.createElement('th'); th2.textContent = k;
-  const td2 = document.createElement('td');
-
-  let rendered = false;
-  if (v != null && String(v).trim() !== ''){
-    const parts = String(v).split(',').map(s=>s.trim()).filter(Boolean);
-    const imgs = [];
-    for (const part of parts){
-      let src = toImageSrc(part); if(!src){ const id = extractDriveId(part); if(id){ src = driveThumb(id, 320); } }
-      if (src){
-        const a = document.createElement('a'); a.href = part; a.target = '_blank'; a.rel = 'noopener';
-const img = document.createElement('img'); img.alt = k; img.style.maxWidth='160px'; img.style.height='auto'; img.style.borderRadius='8px'; img.style.display='block';
-let src = toImageSrc(part);
-if(!src){
-  const id = extractDriveId(part); if(id){ src = driveThumb(id, 320); }
-}
-if(src){ img.src = src; }
-img.onerror = ()=>{ try{ a.textContent = String(part); a.removeChild(img); }catch{} };
-a.appendChild(img);
-imgs.push(a);
-      }
-    }
-    if (imgs.length){
-      const wrap = document.createElement('div'); wrap.style.display='flex'; wrap.style.flexWrap='wrap'; wrap.style.gap='8px';
-      for (const a of imgs) wrap.appendChild(a);
-      td2.appendChild(wrap);
-      rendered = true;
-    }
-  }
-  if (!rendered){
-    td2.textContent = (v != null && String(v).trim() !== '') ? String(v) : '—';
-  }
-  tr2.appendChild(th2); tr2.appendChild(td2);
-  sheetTable.appendChild(tr2);
-}
-
-          if(photoUrls.length){
-            photosEl.style.display = 'grid';
-            photosEl.innerHTML = '';
-            for(const {href,src} of photoUrls){
-              const a = document.createElement('a'); a.href = href; a.target = '_blank'; a.rel = 'noopener';
-              const img = document.createElement('img'); img.src = src; img.alt = 'Photo';
-              a.appendChild(img); photosEl.appendChild(a);
-            }
-          }else{
-            photosEl.style.display = 'none';
-            photosEl.innerHTML = '';
-          }
-    
-          sheetTable.style.display = 'none';
-          sheetTable.innerHTML = '';
-          sheetStatus.textContent = 'No extra columns to display for this row.';
-          // photosEl defined above photosEl.style.display='none'; photosEl.innerHTML='';
-        }
-      }else{
-        sheetTable.style.display = 'none';
-        sheetTable.innerHTML = '';
-        sheetStatus.textContent = 'No sheet match for this Map/Parcel ID.';
-        // photosEl defined above photosEl.style.display='none'; photosEl.innerHTML='';
-      }
-    }else{
-      const sheetStatusEl = document.getElementById('sheetStatus');
-      if(sheetStatusEl) sheetStatusEl.textContent = 'Select a parcel to see sheet info.';
-      const sheetTableEl = document.getElementById('sheetTable');
-      if(sheetTableEl){ sheetTableEl.style.display='none'; sheetTableEl.innerHTML=''; }
-      // photosEl defined above if(photosEl){ photosEl.style.display='none'; photosEl.innerHTML=''; }
-    }
-  }
-
-  let highlight;
-let requestSeq = 0;
-
-  // --- Address search (Esri Geocoder) ---
-  const addrInput = document.getElementById('addrInput');
-  const addrBtn = document.getElementById('addrBtn');
-
-  async function geocodeAddress(q){
-    return new Promise((resolve, reject)=>{
-      try{
-        const ctrl = L.esri.Geocoding.geocode();
-        ctrl.text(q).run((err, results)=>{
-          if(err || !results || !results.results || !results.results.length){ reject(new Error('Address not found')); return; }
-          resolve(results.results[0].latlng);
-        });
-      }catch(e){ reject(e); }
-    });
-  }
-
-  async function searchAndSelect(){
-      const q = (addrInput.value||'').trim();
-      if(!q) return;
-      if (typeof setStatus === 'function') setStatus('Searching…');
-      // 1) Attribute-first
-      if(await fastAttributeSearch(q)){ if (typeof setStatus === 'function') setStatus(''); return; }
-      // 2) Geocode in Hopkinton + nearby snap
-      try{
-        const latlng = await geocodeInHopkinton(q);
-        map.setView(latlng, 17);
-        const fc = await nearbySnap(latlng);
-        if(await selectFirst(fc)){ if (typeof setStatus === 'function') setStatus(''); return; }
-        if (typeof setStatus === 'function') setStatus('No parcel found at that address.');
-      }catch(e){
-        if (typeof setStatus === 'function') setStatus('Address not found.');
-      }
-    }
-
-
-  // --- Google Sheets (Apps Script JSON) integration ---
-  const sheet = {
-    url: 'https://script.google.com/macros/s/AKfycbw03c7Rrm_7oweQJUiprYdF5FXDzRRiYO3WjI97Nezq-D1GOQ69UPzRZNibGai7WL52Rg/exec',
-    index: new Map(),
-    ready: false,
-    headers: [],
-    keyCol: null
-  };
-
-  function normalizeKey(v){ return String(v||'').trim().toUpperCase(); }
-
-  function normalizeRows(json){
-    if(Array.isArray(json)) return json;
-    if(json && typeof json === 'object'){
-      for(const k of ['data','records','items','rows','result','values']){
-        if(Array.isArray(json[k])) return json[k];
-      }
-      for(const k of Object.keys(json)){
-        const v = json[k];
-        if(v && typeof v === 'object'){
-          for(const kk of ['data','records','items','rows','result','values']){
-            if(Array.isArray(v[kk])) return v[kk];
-          }
-        }
-      }
-    }
-    return [];
-  }
-
-  function buildSheetIndex(rows){
-    const status = document.getElementById('sheetStatus');
-    sheet.index.clear();
-    if(!rows.length){ status.textContent = 'Sheet loaded, but no rows.'; sheet.ready=false; return; }
-    sheet.headers = Object.keys(rows[0]);
-    sheet.keyCol = sheet.headers[0]; // FIRST column is key
-    let added = 0;
-    for(const row of rows){
-      const k = normalizeKey(row[sheet.keyCol]);
-      if(k){ sheet.index.set(k, row); added++; }
-    }
-    sheet.ready = true;
-    status.textContent = `Preplans loaded (${rows.length} rows). Key: ${sheet.keyCol}. Indexed: ${added}.`;
-  }
-
-  async function loadSheetJSON(){
-    const status = document.getElementById('sheetStatus');
-    status.textContent = 'Loading preplans sheet…';
-    try{
-      const r = await fetch(sheet.url, { credentials: 'omit' });
-      if(!r.ok) throw new Error('HTTP ' + r.status);
-      const json = await r.json();
-      const rows = normalizeRows(json);
-      buildSheetIndex(rows);
-    }catch(err){
-      status.textContent = 'Failed to load sheet: ' + err.message;
-      sheet.ready = false;
-    }
-  }
-  loadSheetJSON();
-
-
-  // Hopkinton-only parcel layer
-  const parcelLayer = L.esri.featureLayer({
-    url: FS_URL,
-    where: "TOWN_ID = 139",
-    simplifyFactor: 0.2,
-    precision: 6,
-    style: { color:'#60a5fa', weight:1, fillOpacity:0.05 }
-  }).addTo(map);
-
-  parcelLayer.once('load', ()=> setStatus('Hopkinton parcels loaded. Click a parcel.'));
-  parcelLayer.on('loaderror', ()=> setStatus('Layer failed to load.'));
-
-  // Hover highlight & pointer cursor
-  let hoverLayer;
-  parcelLayer.on('mouseover', (e)=>{
-    map.getContainer().style.cursor = 'pointer';
-    if(hoverLayer){ map.removeLayer(hoverLayer); }
-    hoverLayer = (function(layer){ var m=(window.map&&typeof window.map.addLayer==='function')?window.map:(typeof map!=='undefined'&&map&&typeof map.addLayer==='function'?map:null); if(m){ try{ layer.addTo(m); }catch(e){} } return layer; })(L.geoJSON(e.layer.feature, { style: { color:'#a5b4fc', weight:2, fillOpacity:0.15 }, interactive:false }));
-  });
-  parcelLayer.on('mouseout', ()=>{
-    map.getContainer().style.cursor = '';
-    if(hoverLayer){ map.removeLayer(hoverLayer); hoverLayer=null; }
-  });
-
-
-  // Primary: click directly on feature
-  parcelLayer.on('click', (e)=>{
-    if(e.originalEvent){ L.DomEvent.stop(e.originalEvent); }
-
-    setStatus('');
-    if(highlight){ map.removeLayer(highlight); }
-    highlight = (function(layer){ var m=(window.map&&typeof window.map.addLayer==='function')?window.map:(typeof map!=='undefined'&&map&&typeof map.addLayer==='function'?map:null); if(m){ try{ layer.addTo(m); }catch(e){} } return layer; })(L.geoJSON(e.layer.feature, { style: styleSelected }));
-    try{ const b=highlight.getBounds(); if(b && b.isValid()) map.fitBounds(b.pad(0.25)); }catch{}
-    const props = (e.layer.feature && (e.layer.feature.properties || e.layer.feature.attributes)) || {};
-    renderAttributes(props);
-  });
-
-  // Fallback: multi-radius nearby queries with timeouts
-  function queryNearbyRadii(latlng, radii=[3,6,10,16,24], idx=0){
-    if(idx >= radii.length){
-      setStatus('No parcel here. Click another spot.');
-      clearInfo();
-      return;
-    }
-    const r = radii[idx];
-    const q = L.esri.query({ url: FS_URL })
-      .where("TOWN_ID = 139")
-      .nearby(latlng, r)
-      .limit(1);
-
-    let done = false;
-    const to = setTimeout(()=>{
-      if(done) return;
-      // try next radius
-      queryNearbyRadii(latlng, radii, idx+1);
-    }, 3500); // 3.5s safeguard in case of network slowness
-
-    q.run((err, fc)=>{
-      if(done) return;
-      done = true;
-      clearTimeout(to);
-      if(!err && fc && fc.features && fc.features.length){
-        setStatus('');
-        if(highlight){ map.removeLayer(highlight); }
-        highlight = (function(layer){ var m=(window.map&&typeof window.map.addLayer==='function')?window.map:(typeof map!=='undefined'&&map&&typeof map.addLayer==='function'?map:null); if(m){ try{ layer.addTo(m); }catch(e){} } return layer; })(L.geoJSON(fc.features[0], { style: styleSelected }));
-        try{ const b=highlight.getBounds(); if(b && b.isValid()) map.fitBounds(b.pad(0.25)); }catch{}
-        renderAttributes(fc.features[0].properties || {});
-      }else{
-        // try next radius
-        queryNearbyRadii(latlng, radii, idx+1);
-      }
-    });
-  }
-
-  map.on('click', (e)=>{
-    setStatus('Checking…');
-    queryNearbyRadii(e.latlng);
-  });
-})();
-  } catch(e){ console.error("Init error:", e); alert("Map init error: " + e.message); }
-});
-</script>
-
-
-<script>
-// --- Hopkinton parcel search (SITE_ADDR-first) ---
-(() => {
-  const FS_URL = "https://services1.arcgis.com/hGdibHYSPO59RG1h/ArcGIS/rest/services/L3_TAXPAR_POLY_ASSESS_gdb/FeatureServer/0";
-  const setStatus = t => { const el=document.getElementById('status'); if(el) el.textContent=t||''; };
-
-  // small util
-  function N(s){ return String(s||'').toUpperCase().replace(/[.,#]/g,' ').replace(/\s+/g,' ').trim(); }
-  function q(where, limit=5){
-    return new Promise(res => L.esri.query({url:FS_URL}).where(where).returnGeometry(true).limit(limit)
-      .run((err,fc)=>res(err?null:fc)));
-  }
-  async function snap(fc){
-    if(!fc || !fc.features || !fc.features.length) return false;
-    const f = fc.features[0];
-    // highlight + zoom
-    if (window.__parcelHighlight && window.map){ try{ (window.map || (typeof map!=='undefined'?map:null))?.removeLayer(window.__parcelHighlight); }catch{} }
-    if (window.map){
-      window.__parcelHighlight = L.geoJSON(f,{style:{color:'#93c5fd',weight:3,fillColor:'#60a5fa',fillOpacity:.25}}).addTo(window.map || map);
-      try{ const b=window.__parcelHighlight.getBounds(); if(b?.isValid()) window.map.fitBounds(b.pad(.25)); }catch{}
-    }
-    // your existing renderers
-    const props = f.properties || f.attributes || {};
-    if (typeof window.renderAttributes === 'function') window.renderAttributes(props);
-    if (typeof window.showSheetJoin   === 'function') window.showSheetJoin(props);
-    return true;
-  }
-
-  async function addressSearch(raw){
-    const RAW = N(raw);
-    const m = RAW.match(/^(\d+)\s+(.+)$/);
-
-    // Try SITE_ADDR first — this is how Hopkinton usually stores "73 MAIN ST"
-    const tries = [
-      `TOWN_ID=139 AND UPPER(SITE_ADDR)='${RAW}'`,
-      `TOWN_ID=139 AND UPPER(SITE_ADDR) LIKE '${RAW}%'`,
-      `TOWN_ID=139 AND UPPER(SITE_ADDR) LIKE '${RAW.replace(/ STREET$/,' ST')}%'`,
-      `TOWN_ID=139 AND UPPER(SITE_ADDR) LIKE '${RAW.replace(/ ST$/,' STREET')}%'`,
-      // FULL_STR / LOCATION variants
-      `TOWN_ID=139 AND UPPER(FULL_STR)='${RAW}'`,
-      `TOWN_ID=139 AND UPPER(FULL_STR) LIKE '${RAW}%'`,
-      `TOWN_ID=139 AND UPPER(LOCATION)='${RAW}'`,
-      `TOWN_ID=139 AND UPPER(LOCATION) LIKE '${RAW}%'`,
-    ];
-
-    // If the address was typed like "73 MAIN STREET", also try ADDR_NUM + ADDRESS (street-only)
-    if(m){
-      const num = m[1], street = m[2];
-      tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS)='${street}'`);
-      tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street}%'`);
-      tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street.replace(/ STREET$/,' ST')}%'`);
-      tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street.replace(/ ST$/,' STREET')}%'`);
-    }
-
-    // Final contains fallback using the common text fields
-    tries.push(
-      `TOWN_ID=139 AND (`+
-      `UPPER(SITE_ADDR) LIKE '%${RAW}%' OR `+
-      `UPPER(FULL_STR)  LIKE '%${RAW}%' OR `+
-      `UPPER(LOCATION)  LIKE '%${RAW}%')`
-    );
-
-    for(const w of tries){
-      const fc = await q(w, 8);
-      if(await snap(fc)) return true;
-    }
-    return false;
-  }
-
-  async function searchAndSelect(){
-    const input = document.getElementById('addrInput');
-    const qv = input ? input.value.trim() : '';
-    if(!qv) return;
-    setStatus('Searching…');
-
-    if(await addressSearch(qv)){ setStatus(''); return; }
-
-    // Geocode fallback limited to Hopkinton + nearest parcel snap
-    const txt = /hopkinton/i.test(qv) ? qv : `${qv}, Hopkinton, MA`;
-    L.esri.Geocoding.geocode().text(txt).city('Hopkinton').region('MA').maxLocations(1)
-      .run(async (e,r)=>{
-        if(!e && r?.results?.length){
-          const ll = r.results[0].latlng;
-          if (window.map) window.map.setView(ll, 17);
-          const near = await new Promise(res => L.esri.query({url:FS_URL}).where("TOWN_ID=139").nearby(ll,20).limit(1).run((err,fc)=>res(err?null:fc)));
-          if(await snap(near)){ setStatus(''); } else { setStatus('No parcel found.'); }
-        } else {
-          setStatus('Address not found.');
+          a.textContent=part; sheetPhotos.appendChild(a);
         }
       });
+      return;
+    }
+
+    const tr=document.createElement('tr');
+    const th=document.createElement('th'); th.textContent=h;
+    const td=document.createElement('td'); td.textContent=cell;
+    tr.append(th,td); sheetTable.appendChild(tr);
+  });
+}
+
+function showSheetJoin(props){
+  if(!sheet.ready){ sheetStatus.textContent='Sheet not loaded.'; sheetTable.innerHTML=''; sheetPhotos.innerHTML=''; return; }
+  const key = normalizeKey(props.MAP_PAR_ID ?? props.LOC_ID ?? props.MAP_PAR ?? props.PARCELID ?? props.MAP_LOT ?? props.PID ?? props.MAP_PAR_ID_NO ?? props.LOC_ID_1 ?? props.LOC_ID_2);
+  if(!key){ sheetStatus.textContent='No parcel ID available.'; sheetTable.innerHTML=''; sheetPhotos.innerHTML=''; return; }
+  const row = sheet.index.get(key);
+  if(row){ sheetStatus.textContent=`Matched row for ${key}`; renderSheetRow(row); }
+  else   { sheetStatus.textContent=`No preplans for ${key}`; sheetTable.innerHTML=''; sheetPhotos.innerHTML=''; }
+}
+
+// Auto-load sheet
+document.addEventListener('DOMContentLoaded', ()=>{
+  if(!sheet.url){ sheetStatus.textContent='No sheet URL configured.'; return; }
+  sheetStatus.textContent='Loading preplans sheet…';
+  fetch(sheet.url,{credentials:'omit'}).then(r=>r.text()).then(txt=>{
+    try{
+      const json = JSON.parse(txt);
+      const rows = Array.isArray(json) ? json :
+                   Array.isArray(json.data)? json.data :
+                   Array.isArray(json.rows)? json.rows : [];
+      if(rows.length){
+        sheet.headers = Object.keys(rows[0]);
+        const keyCol = sheet.headers[0]; // first column is key
+        rows.forEach(row=>{
+          const key = normalizeKey(row[keyCol]);
+          if(key) sheet.index.set(key,row);
+        });
+        sheet.ready = true;
+        sheetStatus.textContent=`Preplans loaded (${rows.length} rows). Key: ${keyCol}. Indexed: ${sheet.index.size}.`;
+        return;
+      }
+      throw new Error('no JSON rows');
+    }catch{
+      Papa.parse(txt,{header:true,skipEmptyLines:true,complete:(res)=>{
+        const data=res.data||[];
+        if(!data.length){ sheetStatus.textContent='Sheet is empty.'; return; }
+        sheet.headers = Object.keys(data[0]);
+        const keyCol = sheet.headers[0];
+        data.forEach(row=>{
+          const key = normalizeKey(row[keyCol]);
+          if(key) sheet.index.set(key,row);
+        });
+        sheet.ready = true;
+        sheetStatus.textContent=`Preplans loaded (${data.length} rows). Key: ${keyCol}. Indexed: ${sheet.index.size}.`;
+      }, error:()=>{ sheetStatus.textContent='Failed to parse sheet.'; }});
+    }
+  }).catch(()=> sheetStatus.textContent='Failed to fetch sheet.');
+});
+
+// Property renderer
+function pick(o, keys){ for(const k of keys){ if(o && o[k]!=null && String(o[k]).trim()!=='') return o[k]; } return null; }
+function renderAttributes(a){
+  const siteAddr = pick(a,['SITE_ADDR','ADDRESS','FULL_STR','LOCATION']);
+  const city     = pick(a,['CITY','MUNIC','TOWN','CITY_NAME']);
+  const zip      = pick(a,['ZIP','ZIPCODE','ZIP_CODE','POSTCODE']);
+  const zoning   = pick(a,['ZONING','ZONE','ZONING_CODE','ZONE_CODE']);
+  const mappar   = pick(a,['MAP_PAR_ID','LOC_ID','MAP_PAR','PARCELID','MAP_LOT','PID','MAP_PAR_ID_NO','LOC_ID_1','LOC_ID_2']);
+  const stories  = pick(a,['STORIES','STORY_NO','NO_STORY']);
+  const units    = pick(a,['UNITS','NUM_UNITS','UNIT_COUNT']);
+  const style    = pick(a,['STYLE','BLDG_STYLE','HOUSE_STYLE']);
+
+  const pills = []; if(mappar) pills.push(`<span class="pill">${mappar}</span>`);
+  summaryEl.innerHTML = `
+    ${siteAddr?`<div style="font-weight:800;font-size:22px;line-height:1.1;">${String(siteAddr).toUpperCase()}</div>`:''}
+    ${(city||zip)?`<div style="color:#cbd5e1;font-size:18px;margin-top:2px;">${[city,zip].filter(Boolean).join(' ')}</div>`:''}
+    ${pills.length?`<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">${pills.join('')}</div>`:''}
+  `;
+  const rows = [
+    ['Site Address', siteAddr || '—'],
+    ['City',        city || '—'],
+    ['Zip',         zip || '—'],
+    ['Zoning',      zoning || '—'],
+    ['Map/Parcel ID', mappar || '—'],
+    ['Stories',     stories ?? '—'],
+    ['Units',       units ?? '—'],
+    ['Style',       style || '—'],
+  ];
+  attrsTable.innerHTML='';
+  for(const [k,v] of rows){
+    const tr=document.createElement('tr');
+    const th=document.createElement('th'); th.textContent=k;
+    const td=document.createElement('td'); td.textContent=String(v);
+    tr.append(th,td); attrsTable.appendChild(tr);
   }
+  showSheetJoin(a);
+}
 
-  // Wire up your existing inputs
-  const btn  = document.getElementById('addrBtn');
-  const inp  = document.getElementById('addrInput');
-  if(btn) btn.onclick = searchAndSelect;
-  if(inp) inp.addEventListener('keydown', e => { if(e.key==='Enter') searchAndSelect(); });
+let highlight=null;
+function renderFromFeature(feature){
+  if(!feature) return;
+  const props = feature.properties || feature.attributes || {};
+  try{ if(highlight) map.removeLayer(highlight); }catch{}
+  highlight = L.geoJSON(feature,{interactive:false,style:{color:'#93c5fd',weight:3,fillColor:'#60a5fa',fillOpacity:.25}}).addTo(map);
+  try{ const b=highlight.getBounds(); if(b && b.isValid()) map.fitBounds(b.pad(.25)); }catch{}
+  renderAttributes(props);
+}
 
-  // Expose globally if other code calls it
-  window.searchAndSelect = searchAndSelect;
-})();
+// Click on parcel
+parcelLayer.on('click',(e)=>{ if(e.originalEvent) L.DomEvent.stop(e.originalEvent); renderFromFeature(e.layer.feature); });
+
+// Search
+const ST_FIELDS=['ADDRESS','SITE_ADDR','FULL_STR','LOCATION','ST_NAME','STREET','STREETNAME'];
+const esc=s=>String(s).replace(/'/g,"''");
+const norm=s=>String(s||'').toUpperCase().replace(/[.,#]/g,' ').replace(/\s+/g,' ').trim();
+function esriQuery(where,limit=6){
+  return new Promise(res=>L.esri.query({url:FS_URL}).where(where).returnGeometry(true).limit(limit).run((err,fc)=>res(err?null:fc)));
+}
+async function addressSearch(qraw){
+  const RAW=norm(qraw);
+  const tries=[
+    `TOWN_ID=139 AND UPPER(SITE_ADDR)='${RAW}'`,
+    `TOWN_ID=139 AND UPPER(SITE_ADDR) LIKE '${RAW}%'`,
+    `TOWN_ID=139 AND UPPER(SITE_ADDR) LIKE '${RAW.replace(/ STREET$/,' ST')}%'`,
+    `TOWN_ID=139 AND UPPER(SITE_ADDR) LIKE '${RAW.replace(/ ST$/,' STREET')}%'`,
+    `TOWN_ID=139 AND UPPER(FULL_STR)='${RAW}'`,
+    `TOWN_ID=139 AND UPPER(FULL_STR) LIKE '${RAW}%'`,
+    `TOWN_ID=139 AND UPPER(LOCATION)='${RAW}'`,
+    `TOWN_ID=139 AND UPPER(LOCATION) LIKE '${RAW}%'`,
+  ];
+  const m=RAW.match(/^(\d+)\s+(.+)$/);
+  if(m){
+    const num=m[1], street=m[2];
+    tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS)='${street}'`);
+    tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street}%'`);
+    tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street.replace(/ STREET$/,' ST')}%'`);
+    tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street.replace(/ ST$/,' STREET')}%'`);
+  }
+  const ors=ST_FIELDS.map(f=>`UPPER(${f}) LIKE '%${RAW.replace("'","''")}%'`).join(' OR ');
+  tries.push(`TOWN_ID=139 AND (${ors})`);
+
+  for(const w of tries){
+    const fc=await esriQuery(w,8);
+    if(fc && fc.features && fc.features.length){ renderFromFeature(fc.features[0]); return true; }
+  }
+  return false;
+}
+async function geocodeAndSnap(q){
+  return new Promise(resolve=>{
+    const text=/hopkinton/i.test(q)?q:`${q}, Hopkinton, MA`;
+    L.esri.Geocoding.geocode().text(text).city('Hopkinton').region('MA').maxLocations(1)
+      .run(async (e,r)=>{
+        if(!e && r && r.results && r.results.length){
+          const ll=r.results[0].latlng; map.setView(ll,17);
+          const near=await new Promise(res=>L.esri.query({url:FS_URL}).where("TOWN_ID=139").nearby(ll,18).limit(1).run((err,fc)=>res(err?null:fc)));
+          if(near && near.features && near.features.length){ renderFromFeature(near.features[0]); resolve(true); return; }
+        }
+        resolve(false);
+      });
+  });
+}
+async function searchAndSelect(){
+  const q=(addrInput.value||'').trim(); if(!q) return;
+  setStatus('Searching…');
+  try{
+    if(await addressSearch(q)){ setStatus(''); return; }
+    if(await geocodeAndSnap(q)){ setStatus(''); return; }
+    setStatus('Address not found.');
+  }catch(e){ console.error(e); setStatus('Address not found.'); }
+}
+addrBtn.onclick = searchAndSelect;
+addrInput.addEventListener('keydown',e=>{ if(e.key==='Enter') searchAndSelect(); });
+
+parcelLayer.once('load',()=>setStatus('Ready. Click a parcel or search an address.'));
 </script>
-
-
-
-
 </body>
 </html>
