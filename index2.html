@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Hopkinton Property Lookup (Hardcoded Sheet)</title>
+<title>Hopkinton Property Lookup (Photos Inline)</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -24,8 +24,8 @@ header{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1p
 .controls{display:flex;gap:8px;align-items:center}
 .controls input{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0b1220;color:#e5e7eb;min-width:260px}
 .controls button{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0b1220;color:#e5e7eb;cursor:pointer}
-main{display:grid;grid-template-columns:1fr 420px;height:calc(100% - 60px)}
-#map{position:relative;margin:12px;border-radius:12px;overflow:hidden}
+main{display:grid;grid-template-columns:1fr 480px;height:calc(100% - 60px)}
+#map{position:relative;margin:12px;border-radius:12px;overflow:hidden;min-height:60vh}
 aside{border-left:1px solid var(--line);padding:14px;overflow:auto}
 h2{margin:6px 0 8px;font-size:18px}
 .hint{color:var(--muted);min-height:1.2em}
@@ -34,9 +34,9 @@ table.kv{width:100%;border-collapse:collapse;margin-top:6px}
 .kv th,.kv td{padding:10px 8px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
 .kv th{color:#cbd5e1;font-weight:600;width:40%}
 .kv td{color:#e5e7eb}
-.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
-.photos a{display:block;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.photos img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-cell{display:flex;flex-wrap:wrap;gap:6px}
+.photo-cell a{display:block;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.photo-cell img{display:block;width:120px;height:90px;object-fit:cover}
 .small{color:#93a0b5;font-size:12px}
 </style>
 </head>
@@ -62,17 +62,17 @@ table.kv{width:100%;border-collapse:collapse;margin-top:6px}
     <h2 style="margin-top:14px;">Preplans (Google Sheet)</h2>
     <div id="sheetStatus" class="small">Loading…</div>
     <table id="sheetTable" class="kv"></table>
-    <div id="sheetPhotos" class="photos"></div>
   </aside>
 </main>
 
 <script>
-// === Config ===
+// ================== CONFIG ==================
 const SHEET_URL = "https://script.google.com/macros/s/AKfycbw03c7Rrm_7oweQJUiprYdF5FXDzRRiYO3WjI97Nezq-D1GOQ69UPzRZNibGai7WL52Rg/exec";
-const FS_URL = "https://services1.arcgis.com/hGdibHYSPO59RG1h/ArcGIS/rest/services/L3_TAXPAR_POLY_ASSESS_gdb/FeatureServer/0";
-const HOP = [42.228, -71.523];
+const FS_URL    = "https://services1.arcgis.com/hGdibHYSPO59RG1h/ArcGIS/rest/services/L3_TAXPAR_POLY_ASSESS_gdb/FeatureServer/0";
+const HOP       = [42.228, -71.523];
+// ============================================
 
-// === Map ===
+// Map
 const map = L.map('map',{zoomControl:true}).setView(HOP,13);
 window.map = map;
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap'}).addTo(map);
@@ -80,113 +80,128 @@ setTimeout(()=>map.invalidateSize(),120);
 
 // Parcels
 const parcelLayer = L.esri.featureLayer({
-  url:FS_URL, where:"TOWN_ID=139", simplifyFactor:0.2, precision:6,
-  style:{color:'#60a5fa',weight:1,fillOpacity:0.05}
+  url: FS_URL,
+  where: "TOWN_ID=139",
+  simplifyFactor: 0.2,
+  precision: 6,
+  style: { color:'#60a5fa', weight:1, fillOpacity:0.05 }
 }).addTo(map);
 
 // UI refs
-const statusEl=document.getElementById('status');
-const summaryEl=document.getElementById('summary');
-const attrsTable=document.getElementById('attrs');
-const sheetStatus=document.getElementById('sheetStatus');
-const sheetTable=document.getElementById('sheetTable');
-const sheetPhotos=document.getElementById('sheetPhotos');
-const addrInput=document.getElementById('addrInput');
-const addrBtn=document.getElementById('addrBtn');
-function setStatus(t){ if(statusEl) statusEl.textContent=t||''; }
+const statusEl   = document.getElementById('status');
+const summaryEl  = document.getElementById('summary');
+const attrsTable = document.getElementById('attrs');
+const sheetStatus= document.getElementById('sheetStatus');
+const sheetTable = document.getElementById('sheetTable');
+const addrInput  = document.getElementById('addrInput');
+const addrBtn    = document.getElementById('addrBtn');
+function setStatus(t){ if(statusEl) statusEl.textContent = t || ''; }
 
-// === Sheet model ===
+// Sheet model
 const sheet = { url:SHEET_URL, ready:false, headers:[], index:new Map() };
 const normalizeKey = v => String(v||'').toUpperCase().replace(/\s+/g,' ').trim();
 
 function driveThumb(url){
   try{
-    const u=new URL(url);
-    const id=u.searchParams.get('id')||(u.hostname.includes('drive.google.com')?(url.match(/\/file\/d\/([^/]+)/)||[])[1]:null);
-    return id?`https://drive.google.com/thumbnail?id=${id}&sz=w480`:null;
-  }catch{return null;}
+    const u = new URL(url);
+    const id = u.searchParams.get('id') ||
+               (u.hostname.includes('drive.google.com') ? (url.match(/\/file\/d\/([^/]+)/)||[])[1] : null);
+    return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w480` : null;
+  }catch{ return null; }
 }
 
-// Render sheet row in header order
-function renderSheetRow(row){
-  sheetTable.innerHTML=''; sheetPhotos.innerHTML='';
-  const headers = sheet.headers.length? sheet.headers : Object.keys(row);
-  headers.forEach(h=>{
-    if(!(h in row)) return;
-    const val = row[h];
-    if(val==null || String(val).trim()==='') return;
-    const cell = String(val).trim();
+function isPhotoHeader(h){
+  return /(photo|image|img|picture|pic)/i.test(h);
+}
 
-    if (/(photo|image|img|picture|pic|url|link)/i.test(h) || /^https?:\/\//i.test(cell)){
-      const parts = cell.split(',').map(s=>s.trim()).filter(Boolean);
-      parts.forEach(part=>{
-        const a=document.createElement('a'); a.href=part; a.target='_blank'; a.rel='noopener';
-        let src = driveThumb(part);
-        if(!src && /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(part)) src = part;
-        if(src){
-          const img=document.createElement('img');
-          img.src=src; img.alt=h; img.loading='lazy';
+// Render one sheet row strictly in the sheet's column order.
+// Photo columns render inline as thumbnails inside the table cell.
+function renderSheetRow(row){
+  sheetTable.innerHTML = '';
+  const headers = sheet.headers.length ? sheet.headers : Object.keys(row);
+
+  headers.forEach(h=>{
+    if (!(h in row)) return;
+    const valRaw = row[h];
+    const val = String(valRaw ?? '').trim();
+    if (!val) return;
+
+    const tr = document.createElement('tr');
+    const th = document.createElement('th'); th.textContent = h;
+    const td = document.createElement('td');
+
+    if (isPhotoHeader(h) || /^https?:\/\//i.test(val)){
+      const links = val.split(',').map(s=>s.trim()).filter(Boolean);
+      const wrap = document.createElement('div');
+      wrap.className = 'photo-cell';
+      links.forEach(link=>{
+        const a = document.createElement('a'); a.href = link; a.target = '_blank'; a.rel = 'noopener';
+        let src = driveThumb(link);
+        if (!src && /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(link)) src = link;
+        if (src){
+          const img = document.createElement('img'); img.src = src; img.alt = h; img.loading='lazy';
           a.appendChild(img);
-          const wrap=document.createElement('div');
-          wrap.style.border='1px solid var(--line)'; wrap.style.borderRadius='8px'; wrap.style.overflow='hidden';
-          wrap.appendChild(a); sheetPhotos.appendChild(wrap);
-        }else{
-          a.textContent=part; sheetPhotos.appendChild(a);
+        } else {
+          a.textContent = link;
+          a.style.padding = '6px 8px';
         }
+        wrap.appendChild(a);
       });
-      return;
+      td.appendChild(wrap);
+    } else {
+      td.textContent = val;
     }
 
-    const tr=document.createElement('tr');
-    const th=document.createElement('th'); th.textContent=h;
-    const td=document.createElement('td'); td.textContent=cell;
-    tr.append(th,td); sheetTable.appendChild(tr);
+    tr.append(th,td);
+    sheetTable.appendChild(tr);
   });
 }
 
 function showSheetJoin(props){
-  if(!sheet.ready){ sheetStatus.textContent='Sheet not loaded.'; sheetTable.innerHTML=''; sheetPhotos.innerHTML=''; return; }
-  const key = normalizeKey(props.MAP_PAR_ID ?? props.LOC_ID ?? props.MAP_PAR ?? props.PARCELID ?? props.MAP_LOT ?? props.PID ?? props.MAP_PAR_ID_NO ?? props.LOC_ID_1 ?? props.LOC_ID_2);
-  if(!key){ sheetStatus.textContent='No parcel ID available.'; sheetTable.innerHTML=''; sheetPhotos.innerHTML=''; return; }
+  if (!sheet.ready){ sheetStatus.textContent = 'Sheet not loaded.'; sheetTable.innerHTML=''; return; }
+  const key = normalizeKey(
+    props.MAP_PAR_ID ?? props.LOC_ID ?? props.MAP_PAR ?? props.PARCELID ?? props.MAP_LOT ?? props.PID ?? props.MAP_PAR_ID_NO ?? props.LOC_ID_1 ?? props.LOC_ID_2
+  );
+  if (!key){ sheetStatus.textContent='No parcel ID available.'; sheetTable.innerHTML=''; return; }
   const row = sheet.index.get(key);
-  if(row){ sheetStatus.textContent=`Matched row for ${key}`; renderSheetRow(row); }
-  else   { sheetStatus.textContent=`No preplans for ${key}`; sheetTable.innerHTML=''; sheetPhotos.innerHTML=''; }
+  if (row){ sheetStatus.textContent = `Matched row for ${key}`; renderSheetRow(row); }
+  else    { sheetStatus.textContent = `No preplans for ${key}`; sheetTable.innerHTML=''; }
 }
 
-// Auto-load sheet
+// Auto-load sheet (JSON first, then CSV)
 document.addEventListener('DOMContentLoaded', ()=>{
-  if(!sheet.url){ sheetStatus.textContent='No sheet URL configured.'; return; }
-  sheetStatus.textContent='Loading preplans sheet…';
+  if (!sheet.url){ sheetStatus.textContent='No sheet URL configured.'; return; }
+  sheetStatus.textContent = 'Loading preplans sheet…';
   fetch(sheet.url,{credentials:'omit'}).then(r=>r.text()).then(txt=>{
     try{
       const json = JSON.parse(txt);
       const rows = Array.isArray(json) ? json :
-                   Array.isArray(json.data)? json.data :
-                   Array.isArray(json.rows)? json.rows : [];
-      if(rows.length){
-        sheet.headers = Object.keys(rows[0]);
-        const keyCol = sheet.headers[0]; // first column is key
+                   Array.isArray(json.data) ? json.data :
+                   Array.isArray(json.rows) ? json.rows : [];
+      if (rows.length){
+        sheet.headers = Object.keys(rows[0]||{});
+        const keyCol = sheet.headers[0];
         rows.forEach(row=>{
           const key = normalizeKey(row[keyCol]);
-          if(key) sheet.index.set(key,row);
+          if (key) sheet.index.set(key,row);
         });
         sheet.ready = true;
-        sheetStatus.textContent=`Preplans loaded (${rows.length} rows). Key: ${keyCol}. Indexed: ${sheet.index.size}.`;
+        sheetStatus.textContent = `Preplans loaded (${rows.length} rows). Key: ${keyCol}. Indexed: ${sheet.index.size}.`;
         return;
       }
       throw new Error('no JSON rows');
     }catch{
       Papa.parse(txt,{header:true,skipEmptyLines:true,complete:(res)=>{
-        const data=res.data||[];
-        if(!data.length){ sheetStatus.textContent='Sheet is empty.'; return; }
-        sheet.headers = Object.keys(data[0]);
+        const data = res.data||[];
+        if (!data.length){ sheetStatus.textContent='Sheet is empty.'; return; }
+        sheet.headers = Object.keys(data[0]||{});
         const keyCol = sheet.headers[0];
         data.forEach(row=>{
           const key = normalizeKey(row[keyCol]);
-          if(key) sheet.index.set(key,row);
+          if (key) sheet.index.set(key,row);
         });
         sheet.ready = true;
-        sheetStatus.textContent=`Preplans loaded (${data.length} rows). Key: ${keyCol}. Indexed: ${sheet.index.size}.`;
+        sheetStatus.textContent = `Preplans loaded (${data.length} rows). Key: ${keyCol}. Indexed: ${sheet.index.size}.`;
       }, error:()=>{ sheetStatus.textContent='Failed to parse sheet.'; }});
     }
   }).catch(()=> sheetStatus.textContent='Failed to fetch sheet.');
@@ -240,13 +255,13 @@ function renderFromFeature(feature){
   renderAttributes(props);
 }
 
-// Click on parcel
+// Click on parcel → show info + preplans
 parcelLayer.on('click',(e)=>{ if(e.originalEvent) L.DomEvent.stop(e.originalEvent); renderFromFeature(e.layer.feature); });
 
 // Search
 const ST_FIELDS=['ADDRESS','SITE_ADDR','FULL_STR','LOCATION','ST_NAME','STREET','STREETNAME'];
-const esc=s=>String(s).replace(/'/g,"''");
-const norm=s=>String(s||'').toUpperCase().replace(/[.,#]/g,' ').replace(/\s+/g,' ').trim();
+const esc = s => String(s).replace(/'/g,"''");
+const norm= s => String(s||'').toUpperCase().replace(/[.,#]/g,' ').replace(/\s+/g,' ').trim();
 function esriQuery(where,limit=6){
   return new Promise(res=>L.esri.query({url:FS_URL}).where(where).returnGeometry(true).limit(limit).run((err,fc)=>res(err?null:fc)));
 }
@@ -270,7 +285,7 @@ async function addressSearch(qraw){
     tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street.replace(/ STREET$/,' ST')}%'`);
     tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street.replace(/ ST$/,' STREET')}%'`);
   }
-  const ors=ST_FIELDS.map(f=>`UPPER(${f}) LIKE '%${RAW.replace("'","''")}%'`).join(' OR ');
+  const ors=ST_FIELDS.map(f=>`UPPER(${f}) LIKE '%${esc(RAW)}%'`).join(' OR ');
   tries.push(`TOWN_ID=139 AND (${ors})`);
 
   for(const w of tries){
