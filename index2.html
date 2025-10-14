@@ -99,13 +99,12 @@ window.addEventListener("DOMContentLoaded", function(){
   try {
 (function(){
   const HOP = [42.228, -71.523]; // Hopkinton center-ish
-  // Bounding box around Hopkinton (approx)
-  const HOP_BOUNDS = L.latLngBounds([42.14, -71.62], [42.30, -71.45]);
   const FS_URL = "https://services1.arcgis.com/hGdibHYSPO59RG1h/ArcGIS/rest/services/L3_TAXPAR_POLY_ASSESS_gdb/FeatureServer/0";
 
   // Map & basemap
   if(!window.L){ throw new Error('Leaflet not loaded'); }
   const map = L.map('map', { zoomControl:true }).setView(HOP, 13);
+window.map = map;
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20, attribution:'&copy; OpenStreetMap' });
   osm.on('tileerror', (e)=>{ console.warn('Tile error', e); });
   osm.addTo(map);
@@ -355,50 +354,6 @@ imgs.push(a);
   let highlight;
 let requestSeq = 0;
 
-  // --- ADDR_NUM + ADDRESS search (e.g., "73 MAIN STREET") ---
-  const SUFFIX_PAIRS = [[' ST',' STREET'],[' RD',' ROAD'],[' AVE',' AVENUE'],[' DR',' DRIVE'],
-                        [' CT',' COURT'],[' LN',' LANE'],[' HWY',' HIGHWAY'],[' BLVD',' BOULEVARD'],
-                        [' TER',' TERRACE'],[' PKWY',' PARKWAY']];
-  function buildAddrNumAddressWheres(rawUpper){
-    const m = rawUpper.match(/^(\d+)\s+(.+)$/);
-    if(!m) return [];
-    const num = m[1];
-    const street = m[2].replace(/[.,#]/g,' ').replace(/\s+/g,' ').trim();
-    const base = `${num} ${street}`.toUpperCase();
-
-    // generate long/short suffix variants
-    const variants = new Set([base]);
-    for(const [abbr,long] of SUFFIX_PAIRS){
-      if(base.endsWith(abbr)) variants.add(base.replace(abbr,long));
-      if(base.endsWith(long)) variants.add(base.replace(long,abbr));
-    }
-    const esc = s => s.replace(/'/g,"''");
-
-    const wheres = [];
-    for(const v of variants){
-      // Prefer exact ADDR_NUM + ADDRESS match
-      const parts = v.split(' ');
-      const numPart = parts.shift();
-      const streetPart = parts.join(' ');
-      wheres.append = wheres.append || wheres.push; // safety
-      wheres.push(
-        `(TOWN_ID=139) AND (CAST(ADDR_NUM AS VARCHAR(10))='${esc(numPart)}' OR ADDR_NUM=${esc(numPart)}) AND UPPER(ADDRESS)='${esc(streetPart)}'`
-      );
-    }
-    for(const v of variants){
-      const parts = v.split(' ');
-      const numPart = parts.shift();
-      const streetPart = parts.join(' ');
-      wheres.push(
-        `(TOWN_ID=139) AND (CAST(ADDR_NUM AS VARCHAR(10))='${esc(numPart)}' OR ADDR_NUM=${esc(numPart)}) AND UPPER(ADDRESS) LIKE '${esc(streetPart)}%'`
-      );
-    }
-    // loose contains fallback on ADDRESS only with number anywhere
-    wheres.push(`(TOWN_ID=139) AND UPPER(ADDRESS) LIKE '%${esc(street)}%'`);
-    return wheres;
-  }
-
-
   // --- Address search (Esri Geocoder) ---
   const addrInput = document.getElementById('addrInput');
   const addrBtn = document.getElementById('addrBtn');
@@ -406,156 +361,32 @@ let requestSeq = 0;
   async function geocodeAddress(q){
     return new Promise((resolve, reject)=>{
       try{
-        // First attempt: constrain to Hopkinton bbox
-        const geo1 = L.esri.Geocoding.geocode().text(q).within(HOP_BOUNDS).maxLocations(1);
-        geo1.run((err, results)=>{
-          if(!err && results && results.results && results.results.length){
-            resolve(results.results[0].latlng);
-          } else {
-            // Second attempt: explicitly bias city/region
-            const geo2 = L.esri.Geocoding.geocode().text(q).city('Hopkinton').region('MA').maxLocations(1);
-            geo2.run((err2, results2)=>{
-              if(!err2 && results2 && results2.results && results2.results.length){
-                resolve(results2.results[0].latlng);
-              } else {
-                reject(new Error('Address not found'));
-              }
-            });
-          }
+        const ctrl = L.esri.Geocoding.geocode();
+        ctrl.text(q).run((err, results)=>{
+          if(err || !results || !results.results || !results.results.length){ reject(new Error('Address not found')); return; }
+          resolve(results.results[0].latlng);
         });
       }catch(e){ reject(e); }
     });
   }
 
-  
-
-async function searchAndSelect(){
-  const qRaw = (addrInput.value||'').trim();
-  if(!qRaw) return;
-
-  const hasHop = /hopkinton/i.test(qRaw);
-  const qDisplay = hasHop ? qRaw : `${qRaw}, Hopkinton, MA`;
-
-  setStatus('Searching…');
-
-  
-    // First: try parcel attribute search using ADDR_NUM + ADDRESS
-    const rawUpperAA = (addrInput.value||'').toUpperCase().replace(/[.,#]/g,' ').replace(/\s+/g,' ').trim();
-    const wheresAA = buildAddrNumAddressWheres(rawUpperAA);
-    for (const whereAA of wheresAA){
+  async function searchAndSelect(){
+      const q = (addrInput.value||'').trim();
+      if(!q) return;
+      if (typeof setStatus === 'function') setStatus('Searching…');
+      // 1) Attribute-first
+      if(await fastAttributeSearch(q)){ if (typeof setStatus === 'function') setStatus(''); return; }
+      // 2) Geocode in Hopkinton + nearby snap
       try{
-        const fcAA = await new Promise((resolve)=>{
-          L.esri.query({ url: FS_URL }).where(whereAA).returnGeometry(true).limit(10).run((err, geojson)=> resolve(err?null:geojson));
-        });
-        if(fcAA && fcAA.features && fcAA.features.length){
-          // prefer exact street match if present
-          let best = fcAA.features[0];
-          const exact = fcAA.features.find(f => String((f.properties||f.attributes||{}).ADDRESS||'').toUpperCase() === rawUpperAA.replace(/^\d+\s+/,'').trim());
-          if(exact) best = exact;
-          selectFeatureGeoJSON(best);
-          setStatus('');
-          return;
-        }
-      }catch(e){ /* continue to existing logic */ }
+        const latlng = await geocodeInHopkinton(q);
+        map.setView(latlng, 17);
+        const fc = await nearbySnap(latlng);
+        if(await selectFirst(fc)){ if (typeof setStatus === 'function') setStatus(''); return; }
+        if (typeof setStatus === 'function') setStatus('No parcel found at that address.');
+      }catch(e){
+        if (typeof setStatus === 'function') setStatus('Address not found.');
+      }
     }
-    const m = qRaw.match(/^(\d+)\s+(.+)$/i);
-  const rawUpper = qRaw.toUpperCase().trim();
-  const pairs = [
-    [' ST', ' STREET'], [' RD', ' ROAD'], [' AVE', ' AVENUE'], [' DR', ' DRIVE'],
-    [' CT', ' COURT'], [' LN', ' LANE'], [' HWY', ' HIGHWAY'], [' BLVD', ' BOULEVARD'],
-    [' TER', ' TERRACE'], [' PKWY', ' PARKWAY']
-  ];
-  function variantSet(s){
-    const out = new Set([s]);
-    for(const [abbr,long] of pairs){
-      if(s.endsWith(abbr)){ out.add(s.replace(abbr,long)); }
-      if(s.endsWith(long)){ out.add(s.replace(long,abbr)); }
-    }
-    return Array.from(out);
-  }
-
-  try{
-    let where = null;
-    if(m){
-      const num = m[1];
-      const street = m[2].toUpperCase().replace(/[.,#]/g,' ').replace(/\s+/g,' ').trim();
-      const base = `${num} ${street}`.trim();
-      const variants = variantSet(base);
-      const esc = (t)=>t.replace(/'/g,"''");
-      const siteOrs = variants.map(v => `UPPER(SITE_ADDR) LIKE '${esc(v)}%'`);
-      const othersPrefix = variants.flatMap(v => [
-        `UPPER(SITUSADDR) LIKE '${esc(v)}%'`,
-        `UPPER(FULL_STR) LIKE '${esc(v)}%'`,
-        `UPPER(LOCATION) LIKE '${esc(v)}%'`
-      ]);
-      const contains = [`SITE_ADDR`,`SITUSADDR`,`FULL_STR`,`LOCATION`].map(f => `UPPER(${f}) LIKE '%${esc(base)}%'`);
-      where = `(TOWN_ID = 139) AND ((${siteOrs.join(' OR ')}) OR (${othersPrefix.join(' OR ')}) OR (${contains.join(' OR ')}))`;
-    }else{
-      const esc = rawUpper.replace(/'/g,"''");
-      where = `(TOWN_ID = 139) AND (UPPER(SITE_ADDR) LIKE '%${esc}%' OR UPPER(SITUSADDR) LIKE '%${esc}%' OR UPPER(FULL_STR) LIKE '%${esc}%' OR UPPER(LOCATION) LIKE '%${esc}%')`;
-    }
-
-    const fc = await new Promise((resolve)=>{
-      L.esri.query({ url: FS_URL }).where(where).limit(10).run((err, geojson)=> resolve(err ? null : geojson));
-    });
-
-    if(fc && fc.features && fc.features.length){
-      setStatus(`Found ${fc.features.length} match(es).`);
-      const normStarts = (props)=>{
-        const s = String(props.SITE_ADDR||'').toUpperCase();
-        return m ? s.startsWith(`${m[1]} ${m[2].toUpperCase().replace(/[.,#]/g,' ').replace(/\s+/g,' ').trim()}`) : false;
-      };
-      let best = fc.features.find(f => normStarts(f.properties||f.attributes||{})) || fc.features[0];
-      selectFeatureGeoJSON(best);
-      setStatus('');
-      return;
-    }
-  }catch(e){
-  }
-
-  try{
-    const latlng = await geocodeAddress(qDisplay);
-    map.setView(latlng, 17);
-    const radii = [6,10,16,24,32];
-    let selected = false;
-    for(const r of radii){
-      const found = await new Promise((resolve)=>{
-        L.esri.query({ url: FS_URL })
-          .where("TOWN_ID = 139")
-          .nearby(latlng, r)
-          .limit(1)
-          .run((err, fc2)=>{
-            if(!err && fc2 && fc2.features && fc2.features.length){
-              selectFeatureGeoJSON(fc2.features[0]);
-              resolve(true);
-            } else { resolve(false); }
-          });
-      });
-      if(found){ selected = true; break; }
-    }
-    setStatus(selected ? '' : 'No parcel found at that address.');
-  }catch(e){
-    setStatus('Address not found.');
-  }
-}
-
-addrBtn?.addEventListener('click', searchAndSelect);
-addrInput?.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ searchAndSelect(); } });
-
-('click', searchAndSelect);
-  addrInput?.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ searchAndSelect(); } });
-
-
-function selectFeatureGeoJSON(geojson){
-  if(!geojson) return;
-  if(highlight){ try{ map.removeLayer(highlight); }catch(e){}
-    highlight=null;
-  }
-  highlight = L.geoJSON(geojson, { style: { color:'#93c5fd', weight:3, fillColor:'#60a5fa', fillOpacity:0.25 }, interactive:false }).addTo(map);
-  try{ const b = highlight.getBounds(); if(b && b.isValid()) map.fitBounds(b.pad(0.25)); }catch(e){}
-  const props = (geojson.properties || geojson.attributes) || {};
-  renderAttributes(props);
-}
 
 
   // --- Google Sheets (Apps Script JSON) integration ---
@@ -636,7 +467,7 @@ function selectFeatureGeoJSON(geojson){
   parcelLayer.on('mouseover', (e)=>{
     map.getContainer().style.cursor = 'pointer';
     if(hoverLayer){ map.removeLayer(hoverLayer); }
-    hoverLayer = L.geoJSON(e.layer.feature, { style: { color:'#a5b4fc', weight:2, fillOpacity:0.15 }, interactive:false }).addTo(map);
+    hoverLayer = (function(layer){ var m=(window.map&&typeof window.map.addLayer==='function')?window.map:(typeof map!=='undefined'&&map&&typeof map.addLayer==='function'?map:null); if(m){ try{ layer.addTo(m); }catch(e){} } return layer; })(L.geoJSON(e.layer.feature, { style: { color:'#a5b4fc', weight:2, fillOpacity:0.15 }, interactive:false }));
   });
   parcelLayer.on('mouseout', ()=>{
     map.getContainer().style.cursor = '';
@@ -650,7 +481,7 @@ function selectFeatureGeoJSON(geojson){
 
     setStatus('');
     if(highlight){ map.removeLayer(highlight); }
-    highlight = L.geoJSON(e.layer.feature, { style: styleSelected }).addTo(map);
+    highlight = (function(layer){ var m=(window.map&&typeof window.map.addLayer==='function')?window.map:(typeof map!=='undefined'&&map&&typeof map.addLayer==='function'?map:null); if(m){ try{ layer.addTo(m); }catch(e){} } return layer; })(L.geoJSON(e.layer.feature, { style: styleSelected }));
     try{ const b=highlight.getBounds(); if(b && b.isValid()) map.fitBounds(b.pad(0.25)); }catch{}
     const props = (e.layer.feature && (e.layer.feature.properties || e.layer.feature.attributes)) || {};
     renderAttributes(props);
@@ -683,7 +514,7 @@ function selectFeatureGeoJSON(geojson){
       if(!err && fc && fc.features && fc.features.length){
         setStatus('');
         if(highlight){ map.removeLayer(highlight); }
-        highlight = L.geoJSON(fc.features[0], { style: styleSelected }).addTo(map);
+        highlight = (function(layer){ var m=(window.map&&typeof window.map.addLayer==='function')?window.map:(typeof map!=='undefined'&&map&&typeof map.addLayer==='function'?map:null); if(m){ try{ layer.addTo(m); }catch(e){} } return layer; })(L.geoJSON(fc.features[0], { style: styleSelected }));
         try{ const b=highlight.getBounds(); if(b && b.isValid()) map.fitBounds(b.pad(0.25)); }catch{}
         renderAttributes(fc.features[0].properties || {});
       }else{
@@ -701,5 +532,113 @@ function selectFeatureGeoJSON(geojson){
   } catch(e){ console.error("Init error:", e); alert("Map init error: " + e.message); }
 });
 </script>
+
+
+<script>
+// --- Hopkinton parcel search (SITE_ADDR-first) ---
+(() => {
+  const FS_URL = "https://services1.arcgis.com/hGdibHYSPO59RG1h/ArcGIS/rest/services/L3_TAXPAR_POLY_ASSESS_gdb/FeatureServer/0";
+  const setStatus = t => { const el=document.getElementById('status'); if(el) el.textContent=t||''; };
+
+  // small util
+  function N(s){ return String(s||'').toUpperCase().replace(/[.,#]/g,' ').replace(/\s+/g,' ').trim(); }
+  function q(where, limit=5){
+    return new Promise(res => L.esri.query({url:FS_URL}).where(where).returnGeometry(true).limit(limit)
+      .run((err,fc)=>res(err?null:fc)));
+  }
+  async function snap(fc){
+    if(!fc || !fc.features || !fc.features.length) return false;
+    const f = fc.features[0];
+    // highlight + zoom
+    if (window.__parcelHighlight && window.map){ try{ (window.map || (typeof map!=='undefined'?map:null))?.removeLayer(window.__parcelHighlight); }catch{} }
+    if (window.map){
+      window.__parcelHighlight = L.geoJSON(f,{style:{color:'#93c5fd',weight:3,fillColor:'#60a5fa',fillOpacity:.25}}).addTo(window.map || map);
+      try{ const b=window.__parcelHighlight.getBounds(); if(b?.isValid()) window.map.fitBounds(b.pad(.25)); }catch{}
+    }
+    // your existing renderers
+    const props = f.properties || f.attributes || {};
+    if (typeof window.renderAttributes === 'function') window.renderAttributes(props);
+    if (typeof window.showSheetJoin   === 'function') window.showSheetJoin(props);
+    return true;
+  }
+
+  async function addressSearch(raw){
+    const RAW = N(raw);
+    const m = RAW.match(/^(\d+)\s+(.+)$/);
+
+    // Try SITE_ADDR first — this is how Hopkinton usually stores "73 MAIN ST"
+    const tries = [
+      `TOWN_ID=139 AND UPPER(SITE_ADDR)='${RAW}'`,
+      `TOWN_ID=139 AND UPPER(SITE_ADDR) LIKE '${RAW}%'`,
+      `TOWN_ID=139 AND UPPER(SITE_ADDR) LIKE '${RAW.replace(/ STREET$/,' ST')}%'`,
+      `TOWN_ID=139 AND UPPER(SITE_ADDR) LIKE '${RAW.replace(/ ST$/,' STREET')}%'`,
+      // FULL_STR / LOCATION variants
+      `TOWN_ID=139 AND UPPER(FULL_STR)='${RAW}'`,
+      `TOWN_ID=139 AND UPPER(FULL_STR) LIKE '${RAW}%'`,
+      `TOWN_ID=139 AND UPPER(LOCATION)='${RAW}'`,
+      `TOWN_ID=139 AND UPPER(LOCATION) LIKE '${RAW}%'`,
+    ];
+
+    // If the address was typed like "73 MAIN STREET", also try ADDR_NUM + ADDRESS (street-only)
+    if(m){
+      const num = m[1], street = m[2];
+      tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS)='${street}'`);
+      tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street}%'`);
+      tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street.replace(/ STREET$/,' ST')}%'`);
+      tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street.replace(/ ST$/,' STREET')}%'`);
+    }
+
+    // Final contains fallback using the common text fields
+    tries.push(
+      `TOWN_ID=139 AND (`+
+      `UPPER(SITE_ADDR) LIKE '%${RAW}%' OR `+
+      `UPPER(FULL_STR)  LIKE '%${RAW}%' OR `+
+      `UPPER(LOCATION)  LIKE '%${RAW}%')`
+    );
+
+    for(const w of tries){
+      const fc = await q(w, 8);
+      if(await snap(fc)) return true;
+    }
+    return false;
+  }
+
+  async function searchAndSelect(){
+    const input = document.getElementById('addrInput');
+    const qv = input ? input.value.trim() : '';
+    if(!qv) return;
+    setStatus('Searching…');
+
+    if(await addressSearch(qv)){ setStatus(''); return; }
+
+    // Geocode fallback limited to Hopkinton + nearest parcel snap
+    const txt = /hopkinton/i.test(qv) ? qv : `${qv}, Hopkinton, MA`;
+    L.esri.Geocoding.geocode().text(txt).city('Hopkinton').region('MA').maxLocations(1)
+      .run(async (e,r)=>{
+        if(!e && r?.results?.length){
+          const ll = r.results[0].latlng;
+          if (window.map) window.map.setView(ll, 17);
+          const near = await new Promise(res => L.esri.query({url:FS_URL}).where("TOWN_ID=139").nearby(ll,20).limit(1).run((err,fc)=>res(err?null:fc)));
+          if(await snap(near)){ setStatus(''); } else { setStatus('No parcel found.'); }
+        } else {
+          setStatus('Address not found.');
+        }
+      });
+  }
+
+  // Wire up your existing inputs
+  const btn  = document.getElementById('addrBtn');
+  const inp  = document.getElementById('addrInput');
+  if(btn) btn.onclick = searchAndSelect;
+  if(inp) inp.addEventListener('keydown', e => { if(e.key==='Enter') searchAndSelect(); });
+
+  // Expose globally if other code calls it
+  window.searchAndSelect = searchAndSelect;
+})();
+</script>
+
+
+
+
 </body>
 </html>
