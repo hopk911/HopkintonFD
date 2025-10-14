@@ -30,13 +30,13 @@ main{
   min-height: calc(100vh - 60px);
 }
 
-/* Map keeps proportion via aspect-ratio; height auto follows width */
+/* Map scales with width via aspect-ratio */
 #map{
   position:relative;
   margin:12px;
   border-radius:12px;
   overflow:hidden;
-  aspect-ratio: 16 / 11;    /* adjust as you like */
+  aspect-ratio: 16 / 11;
   height: auto;
   min-height: 320px;
 }
@@ -55,17 +55,14 @@ table.kv{width:100%;border-collapse:collapse;margin-top:6px}
 .photo-cell a{display:block;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .photo-cell img{display:block;width:120px;height:90px;object-fit:cover}
 .small{color:#93a0b5;font-size:12px}
-#sheetStatus{display:none} /* hide sheet status */
+#sheetStatus{display:none}
 
 /* --- Stack map & panel when narrow --- */
 @media (max-width: 1024px){
-  main{
-    grid-template-columns: 1fr;
-    grid-auto-rows: auto;
-  }
+  main{ grid-template-columns: 1fr; grid-auto-rows: auto; }
   #map{
     margin:12px 12px 0 12px;
-    aspect-ratio: 16 / 12;  /* a touch taller when stacked */
+    aspect-ratio: 16 / 12;
     min-height: 300px;
   }
   aside{
@@ -129,17 +126,13 @@ const parcelLayer = L.esri.featureLayer({
 const statusEl    = document.getElementById('status');
 const summaryEl   = document.getElementById('summary');
 const attrsTable  = document.getElementById('attrs');
-const sheetStatus = document.getElementById('sheetStatus');
 const sheetTable  = document.getElementById('sheetTable');
 const sheetPhotosTop = document.getElementById('sheetPhotosTop');
 const addrInput   = document.getElementById('addrInput');
 const addrBtn     = document.getElementById('addrBtn');
 function setStatus(t){ if(statusEl) statusEl.textContent = t || ''; }
 
-// Sheet model
-const sheet = { url:SHEET_URL, ready:false, headers:[], index:new Map() };
-const normalizeKey = v => String(v||'').toUpperCase().replace(/\s+/g,' ').trim();
-
+// --- helpers ---
 function driveThumb(url){
   try{
     const u = new URL(url);
@@ -148,21 +141,41 @@ function driveThumb(url){
     return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w480` : null;
   }catch{ return null; }
 }
+const isPhotoHeader   = h => /(photo|image|img|picture|pic)/i.test(h);
+const isTimestamp     = h => /^timestamp$/i.test(h);
+const equalsPhotoName = h => /^photo$/i.test(h);
+const normHeader = h => String(h || '')
+  .toLowerCase()
+  .normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9]/g, '');
+const isSheetAddress = h => {
+  const n = normHeader(h);
+  return (
+    n === 'address'        ||
+    n === 'siteaddress'    ||
+    n === 'siteaddr'       ||
+    n === 'streetaddress'  ||
+    n === 'fullstr'        ||
+    n === 'location'       ||
+    n.startsWith('address')||
+    n.startsWith('siteaddress')
+  );
+};
 
-const isPhotoHeader    = h => /(photo|image|img|picture|pic)/i.test(h);
-const isTimestamp      = h => /^timestamp$/i.test(h); // always hidden
-const isSheetAddress   = h => /^(address|site\s*address|location|full_str)$/i.test(h); // hide in sheet (address shown up top)
-const equalsPhotoName  = h => /^photo$/i.test(h); // header literally "Photo"
+// Sheet model
+const sheet = { url:SHEET_URL, ready:false, headers:[], index:new Map() };
+const normalizeKey = v => String(v||'').toUpperCase().replace(/\s+/g,' ').trim();
 
 // Prefer header named "Photo"; else use Column C (index 2)
 function getTopPhotoHeader(){
   if (!sheet.headers || sheet.headers.length === 0) return null;
   const named = sheet.headers.find(equalsPhotoName);
   if (named) return named;
-  return sheet.headers[2] || null; // Column C fallback
+  return sheet.headers[2] || null;
 }
 
-// ---------- Top strip: ONLY Column C (or header 'Photo') ----------
+// ---------- Top strip: ONLY Column C / "Photo" ----------
 function renderSheetPhotosTop(row){
   sheetPhotosTop.innerHTML = '';
   const topHeader = getTopPhotoHeader();
@@ -186,7 +199,7 @@ function renderSheetPhotosTop(row){
   });
 }
 
-// ---------- Inline sheet table: all other columns (incl. other photo columns) ----------
+// ---------- Inline sheet table: all other columns ----------
 function renderSheetFields(row){
   sheetTable.innerHTML = '';
   const headers = sheet.headers.length ? sheet.headers : Object.keys(row);
@@ -195,11 +208,11 @@ function renderSheetFields(row){
   headers.forEach(h=>{
     if(!(h in row)) return;
     if (isTimestamp(h)) return;        // hide Timestamp
-    if (isSheetAddress(h)) return;     // hide sheet address
-    if (topHeader && h === topHeader) return; // Column C already placed up top
+    if (isSheetAddress(h)) return;     // hide sheet address columns
+    if (topHeader && h === topHeader) return; // Column C up top
 
     const val = String(row[h] ?? '').trim();
-    if(!val) return;                   // hide empty
+    if(!val) return;
 
     const tr = document.createElement('tr');
     const th = document.createElement('th'); th.textContent = h;
@@ -218,8 +231,7 @@ function renderSheetFields(row){
           const img = document.createElement('img'); img.src = src; img.alt = h; img.loading='lazy';
           a.appendChild(img);
         } else {
-          a.textContent = link;
-          a.style.padding = '6px 8px';
+          a.textContent = link; a.style.padding = '6px 8px';
         }
         wrap.appendChild(a);
       });
@@ -242,8 +254,8 @@ function showSheetJoin(props){
   if (!key){ sheetTable.innerHTML=''; sheetPhotosTop.innerHTML=''; return; }
   const row = sheet.index.get(key);
   if (row){
-    renderSheetPhotosTop(row);  // only Column C / "Photo" above Site Address
-    renderSheetFields(row);     // everything else inline (incl. other photo columns)
+    renderSheetPhotosTop(row);
+    renderSheetFields(row);
   } else {
     sheetTable.innerHTML=''; sheetPhotosTop.innerHTML='';
   }
@@ -285,7 +297,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   });
 });
 
-// -------- Parcel attributes (hide unpopulated rows) ----------
+// -------- Parcel attributes --------
 function pick(o, keys){
   for(const k of keys){
     if(o && o[k]!=null){
@@ -349,11 +361,11 @@ function renderAttributes(a){
     tr.append(th,td); attrsTable.appendChild(tr);
   }
 
-  // After attrs table is built, overlay with sheet data/photos (adds Column C above Site Address)
+  // After attrs table is built, add Google Sheet join (Column C above address)
   showSheetJoin(a);
 }
 
-// Keep a highlight polygon for selected parcel
+// Highlight and show feature
 let highlight=null;
 function renderFromFeature(feature){
   if(!feature) return;
@@ -361,21 +373,19 @@ function renderFromFeature(feature){
   try{ if(highlight) map.removeLayer(highlight); }catch{}
   highlight = L.geoJSON(feature,{interactive:false,style:{color:'#93c5fd',weight:3,fillColor:'#60a5fa',fillOpacity:.25}}).addTo(map);
   try{ const b=highlight.getBounds(); if(b && b.isValid()) map.fitBounds(b.pad(.25)); }catch{}
-  renderAttributes(props); // <-- shows info automatically
+  renderAttributes(props);
 }
 
 // Click on parcel → show info + sheet join
 parcelLayer.on('click',(e)=>{ if(e.originalEvent) L.DomEvent.stop(e.originalEvent); renderFromFeature(e.layer.feature); });
 
-// -------- Search: try exact/like matches first, then geocode & snap --------
+// -------- Search: field tries then geocode --------
 const ST_FIELDS=['ADDRESS','SITE_ADDR','FULL_STR','LOCATION','ST_NAME','STREET','STREETNAME'];
 const esc = s => String(s).replace(/'/g,"''");
 const norm= s => String(s||'').toUpperCase().replace(/[.,#]/g,' ').replace(/\s+/g,' ').trim();
-
 function esriQuery(where,limit=6){
   return new Promise(res=>L.esri.query({url:FS_URL}).where(where).returnGeometry(true).limit(limit).run((err,fc)=>res(err?null:fc)));
 }
-
 async function addressSearch(qraw){
   const RAW=norm(qraw);
   const tries=[
@@ -402,13 +412,12 @@ async function addressSearch(qraw){
   for(const w of tries){
     const fc=await esriQuery(w,8);
     if(fc && fc.features && fc.features.length){
-      renderFromFeature(fc.features[0]); // <-- show result immediately
+      renderFromFeature(fc.features[0]); // show result immediately
       return true;
     }
   }
   return false;
 }
-
 async function geocodeAndSnap(q){
   return new Promise(resolve=>{
     const text=/hopkinton/i.test(q)?q:`${q}, Hopkinton, MA`;
@@ -418,7 +427,7 @@ async function geocodeAndSnap(q){
           const ll=r.results[0].latlng; map.setView(ll,17);
           const near=await new Promise(res=>L.esri.query({url:FS_URL}).where("TOWN_ID=139").nearby(ll,18).limit(1).run((err,fc)=>res(err?null:fc)));
           if(near && near.features && near.features.length){
-            renderFromFeature(near.features[0]); // <-- show result immediately
+            renderFromFeature(near.features[0]);
             resolve(true); return;
           }
         }
@@ -426,7 +435,6 @@ async function geocodeAndSnap(q){
       });
   });
 }
-
 async function searchAndSelect(){
   const q=(addrInput.value||'').trim(); if(!q) return;
   setStatus('Searching…');
@@ -439,7 +447,7 @@ async function searchAndSelect(){
 addrBtn.onclick = searchAndSelect;
 addrInput.addEventListener('keydown',e=>{ if(e.key==='Enter') searchAndSelect(); });
 
-parcelLayer.once('load',()=>setStatus('Ready.'));
+parcelLayer.once('load',()=>setStatus(''));
 </script>
 </body>
 </html>
