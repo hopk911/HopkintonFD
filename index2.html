@@ -3,16 +3,13 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Hopkinton Property Lookup (Photos Inline)</title>
+<title>Hopkinton Property Lookup</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
-
 <link rel="stylesheet" href="https://unpkg.com/esri-leaflet-geocoder@3.1.4/dist/esri-leaflet-geocoder.css"/>
 <script src="https://unpkg.com/esri-leaflet-geocoder@3.1.4/dist/esri-leaflet-geocoder.js"></script>
-
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
@@ -20,24 +17,63 @@
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
 header{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1px solid var(--line)}
-.bar{max-width:1300px;margin:0 auto;padding:10px 14px;display:grid;grid-template-columns:1fr auto;gap:10px}
+.bar{max-width:1300px;margin:0 auto;padding:10px 14px;display:grid;grid-template-columns:1fr;gap:10px}
 .controls{display:flex;gap:8px;align-items:center}
 .controls input{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0b1220;color:#e5e7eb;min-width:260px}
 .controls button{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0b1220;color:#e5e7eb;cursor:pointer}
-main{display:grid;grid-template-columns:1fr 480px;height:calc(100% - 60px)}
-#map{position:relative;margin:12px;border-radius:12px;overflow:hidden;min-height:60vh}
+
+/* --- Responsive layout --- */
+main{
+  display:grid;
+  grid-template-columns: 1fr 480px;
+  gap: 0;
+  min-height: calc(100vh - 60px);
+}
+
+/* Map keeps proportion via aspect-ratio; height auto follows width */
+#map{
+  position:relative;
+  margin:12px;
+  border-radius:12px;
+  overflow:hidden;
+  aspect-ratio: 16 / 11;    /* adjust as you like */
+  height: auto;
+  min-height: 320px;
+}
+
 aside{border-left:1px solid var(--line);padding:14px;overflow:auto}
-h2{margin:6px 0 8px;font-size:18px}
 .hint{color:var(--muted);min-height:1.2em}
 .summary .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:#cbd5e1}
 table.kv{width:100%;border-collapse:collapse;margin-top:6px}
 .kv th,.kv td{padding:10px 8px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
 .kv th{color:#cbd5e1;font-weight:600;width:40%}
 .kv td{color:#e5e7eb}
+.photo-strip{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.photo-strip a{display:block;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.photo-strip img{display:block;width:140px;height:105px;object-fit:cover}
 .photo-cell{display:flex;flex-wrap:wrap;gap:6px}
 .photo-cell a{display:block;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .photo-cell img{display:block;width:120px;height:90px;object-fit:cover}
 .small{color:#93a0b5;font-size:12px}
+#sheetStatus{display:none} /* hide sheet status */
+
+/* --- Stack map & panel when narrow --- */
+@media (max-width: 1024px){
+  main{
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+  #map{
+    margin:12px 12px 0 12px;
+    aspect-ratio: 16 / 12;  /* a touch taller when stacked */
+    min-height: 300px;
+  }
+  aside{
+    border-left: none;
+    border-top: 1px solid var(--line);
+    padding: 12px;
+  }
+}
 </style>
 </head>
 <body>
@@ -48,19 +84,19 @@ table.kv{width:100%;border-collapse:collapse;margin-top:6px}
       <button id="addrBtn">Search</button>
       <span id="status" class="hint"></span>
     </div>
-    <div class="controls"><span class="small">Hopkinton parcels + preplans</span></div>
   </div>
 </header>
 
 <main>
   <div id="map"></div>
   <aside>
-    <h2>Property Info</h2>
     <div id="summary" class="summary"></div>
-    <table id="attrs" class="kv"></table>
 
-    <h2 style="margin-top:14px;">Preplans (Google Sheet)</h2>
-    <div id="sheetStatus" class="small">Loading…</div>
+    <!-- Only the Sheet's Column C (or header exactly 'Photo') goes here -->
+    <div id="sheetPhotosTop" class="photo-strip"></div>
+
+    <table id="attrs" class="kv"></table>
+    <div id="sheetStatus" class="small"></div>
     <table id="sheetTable" class="kv"></table>
   </aside>
 </main>
@@ -76,7 +112,9 @@ const HOP       = [42.228, -71.523];
 const map = L.map('map',{zoomControl:true}).setView(HOP,13);
 window.map = map;
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap'}).addTo(map);
-setTimeout(()=>map.invalidateSize(),120);
+// Keep Leaflet crisp on size changes
+let resizeRaf=null; window.addEventListener('resize',()=>{ if(resizeRaf) cancelAnimationFrame(resizeRaf); resizeRaf=requestAnimationFrame(()=>map.invalidateSize()); });
+setTimeout(()=>map.invalidateSize(),150);
 
 // Parcels
 const parcelLayer = L.esri.featureLayer({
@@ -88,13 +126,14 @@ const parcelLayer = L.esri.featureLayer({
 }).addTo(map);
 
 // UI refs
-const statusEl   = document.getElementById('status');
-const summaryEl  = document.getElementById('summary');
-const attrsTable = document.getElementById('attrs');
-const sheetStatus= document.getElementById('sheetStatus');
-const sheetTable = document.getElementById('sheetTable');
-const addrInput  = document.getElementById('addrInput');
-const addrBtn    = document.getElementById('addrBtn');
+const statusEl    = document.getElementById('status');
+const summaryEl   = document.getElementById('summary');
+const attrsTable  = document.getElementById('attrs');
+const sheetStatus = document.getElementById('sheetStatus');
+const sheetTable  = document.getElementById('sheetTable');
+const sheetPhotosTop = document.getElementById('sheetPhotosTop');
+const addrInput   = document.getElementById('addrInput');
+const addrBtn     = document.getElementById('addrBtn');
 function setStatus(t){ if(statusEl) statusEl.textContent = t || ''; }
 
 // Sheet model
@@ -110,21 +149,57 @@ function driveThumb(url){
   }catch{ return null; }
 }
 
-function isPhotoHeader(h){
-  return /(photo|image|img|picture|pic)/i.test(h);
+const isPhotoHeader    = h => /(photo|image|img|picture|pic)/i.test(h);
+const isTimestamp      = h => /^timestamp$/i.test(h); // always hidden
+const isSheetAddress   = h => /^(address|site\s*address|location|full_str)$/i.test(h); // hide in sheet (address shown up top)
+const equalsPhotoName  = h => /^photo$/i.test(h); // header literally "Photo"
+
+// Prefer header named "Photo"; else use Column C (index 2)
+function getTopPhotoHeader(){
+  if (!sheet.headers || sheet.headers.length === 0) return null;
+  const named = sheet.headers.find(equalsPhotoName);
+  if (named) return named;
+  return sheet.headers[2] || null; // Column C fallback
 }
 
-// Render one sheet row strictly in the sheet's column order.
-// Photo columns render inline as thumbnails inside the table cell.
-function renderSheetRow(row){
+// ---------- Top strip: ONLY Column C (or header 'Photo') ----------
+function renderSheetPhotosTop(row){
+  sheetPhotosTop.innerHTML = '';
+  const topHeader = getTopPhotoHeader();
+  if (!topHeader || !(topHeader in row)) return;
+
+  const cell = String(row[topHeader] ?? '').trim();
+  if(!cell) return;
+
+  const links = cell.split(',').map(s=>s.trim()).filter(Boolean);
+  links.forEach(link=>{
+    const a = document.createElement('a'); a.href = link; a.target = '_blank'; a.rel = 'noopener';
+    let src = driveThumb(link);
+    if(!src && /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(link)) src = link;
+    if(src){
+      const img = document.createElement('img'); img.src = src; img.alt = topHeader; img.loading='lazy';
+      a.appendChild(img);
+    }else{
+      a.textContent = link; a.style.padding = '6px 8px';
+    }
+    sheetPhotosTop.appendChild(a);
+  });
+}
+
+// ---------- Inline sheet table: all other columns (incl. other photo columns) ----------
+function renderSheetFields(row){
   sheetTable.innerHTML = '';
   const headers = sheet.headers.length ? sheet.headers : Object.keys(row);
+  const topHeader = getTopPhotoHeader();
 
   headers.forEach(h=>{
-    if (!(h in row)) return;
-    const valRaw = row[h];
-    const val = String(valRaw ?? '').trim();
-    if (!val) return;
+    if(!(h in row)) return;
+    if (isTimestamp(h)) return;        // hide Timestamp
+    if (isSheetAddress(h)) return;     // hide sheet address
+    if (topHeader && h === topHeader) return; // Column C already placed up top
+
+    const val = String(row[h] ?? '').trim();
+    if(!val) return;                   // hide empty
 
     const tr = document.createElement('tr');
     const th = document.createElement('th'); th.textContent = h;
@@ -132,6 +207,7 @@ function renderSheetRow(row){
 
     if (isPhotoHeader(h) || /^https?:\/\//i.test(val)){
       const links = val.split(',').map(s=>s.trim()).filter(Boolean);
+      if (!links.length) return;
       const wrap = document.createElement('div');
       wrap.className = 'photo-cell';
       links.forEach(link=>{
@@ -147,6 +223,7 @@ function renderSheetRow(row){
         }
         wrap.appendChild(a);
       });
+      if (!wrap.childNodes.length) return;
       td.appendChild(wrap);
     } else {
       td.textContent = val;
@@ -158,20 +235,23 @@ function renderSheetRow(row){
 }
 
 function showSheetJoin(props){
-  if (!sheet.ready){ sheetStatus.textContent = 'Sheet not loaded.'; sheetTable.innerHTML=''; return; }
+  if (!sheet.ready){ sheetTable.innerHTML=''; sheetPhotosTop.innerHTML=''; return; }
   const key = normalizeKey(
     props.MAP_PAR_ID ?? props.LOC_ID ?? props.MAP_PAR ?? props.PARCELID ?? props.MAP_LOT ?? props.PID ?? props.MAP_PAR_ID_NO ?? props.LOC_ID_1 ?? props.LOC_ID_2
   );
-  if (!key){ sheetStatus.textContent='No parcel ID available.'; sheetTable.innerHTML=''; return; }
+  if (!key){ sheetTable.innerHTML=''; sheetPhotosTop.innerHTML=''; return; }
   const row = sheet.index.get(key);
-  if (row){ sheetStatus.textContent = `Matched row for ${key}`; renderSheetRow(row); }
-  else    { sheetStatus.textContent = `No preplans for ${key}`; sheetTable.innerHTML=''; }
+  if (row){
+    renderSheetPhotosTop(row);  // only Column C / "Photo" above Site Address
+    renderSheetFields(row);     // everything else inline (incl. other photo columns)
+  } else {
+    sheetTable.innerHTML=''; sheetPhotosTop.innerHTML='';
+  }
 }
 
 // Auto-load sheet (JSON first, then CSV)
 document.addEventListener('DOMContentLoaded', ()=>{
-  if (!sheet.url){ sheetStatus.textContent='No sheet URL configured.'; return; }
-  sheetStatus.textContent = 'Loading preplans sheet…';
+  if (!sheet.url){ return; }
   fetch(sheet.url,{credentials:'omit'}).then(r=>r.text()).then(txt=>{
     try{
       const json = JSON.parse(txt);
@@ -186,14 +266,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
           if (key) sheet.index.set(key,row);
         });
         sheet.ready = true;
-        sheetStatus.textContent = `Preplans loaded (${rows.length} rows). Key: ${keyCol}. Indexed: ${sheet.index.size}.`;
         return;
       }
       throw new Error('no JSON rows');
     }catch{
       Papa.parse(txt,{header:true,skipEmptyLines:true,complete:(res)=>{
         const data = res.data||[];
-        if (!data.length){ sheetStatus.textContent='Sheet is empty.'; return; }
+        if (!data.length){ return; }
         sheet.headers = Object.keys(data[0]||{});
         const keyCol = sheet.headers[0];
         data.forEach(row=>{
@@ -201,15 +280,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
           if (key) sheet.index.set(key,row);
         });
         sheet.ready = true;
-        sheetStatus.textContent = `Preplans loaded (${data.length} rows). Key: ${keyCol}. Indexed: ${sheet.index.size}.`;
-      }, error:()=>{ sheetStatus.textContent='Failed to parse sheet.'; }});
+      }});
     }
-  }).catch(()=> sheetStatus.textContent='Failed to fetch sheet.');
+  });
 });
 
-// Property renderer
-function pick(o, keys){ for(const k of keys){ if(o && o[k]!=null && String(o[k]).trim()!=='') return o[k]; } return null; }
+// -------- Parcel attributes (hide unpopulated rows) ----------
+function pick(o, keys){
+  for(const k of keys){
+    if(o && o[k]!=null){
+      const v = String(o[k]).trim();
+      if(v) return v;
+    }
+  }
+  return null;
+}
 function renderAttributes(a){
+  const rows = [];
   const siteAddr = pick(a,['SITE_ADDR','ADDRESS','FULL_STR','LOCATION']);
   const city     = pick(a,['CITY','MUNIC','TOWN','CITY_NAME']);
   const zip      = pick(a,['ZIP','ZIPCODE','ZIP_CODE','POSTCODE']);
@@ -219,22 +306,41 @@ function renderAttributes(a){
   const units    = pick(a,['UNITS','NUM_UNITS','UNIT_COUNT']);
   const style    = pick(a,['STYLE','BLDG_STYLE','HOUSE_STYLE']);
 
-  const pills = []; if(mappar) pills.push(`<span class="pill">${mappar}</span>`);
-  summaryEl.innerHTML = `
-    ${siteAddr?`<div style="font-weight:800;font-size:22px;line-height:1.1;">${String(siteAddr).toUpperCase()}</div>`:''}
-    ${(city||zip)?`<div style="color:#cbd5e1;font-size:18px;margin-top:2px;">${[city,zip].filter(Boolean).join(' ')}</div>`:''}
-    ${pills.length?`<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">${pills.join('')}</div>`:''}
-  `;
-  const rows = [
-    ['Site Address', siteAddr || '—'],
-    ['City',        city || '—'],
-    ['Zip',         zip || '—'],
-    ['Zoning',      zoning || '—'],
-    ['Map/Parcel ID', mappar || '—'],
-    ['Stories',     stories ?? '—'],
-    ['Units',       units ?? '—'],
-    ['Style',       style || '—'],
-  ];
+  // Title (address) at top
+  summaryEl.innerHTML = '';
+  if (siteAddr){
+    const title = document.createElement('div');
+    title.style.fontWeight = '800';
+    title.style.fontSize = '22px';
+    title.style.lineHeight = '1.1';
+    title.textContent = String(siteAddr).toUpperCase();
+    summaryEl.appendChild(title);
+  }
+  if (city || zip){
+    const sub = document.createElement('div');
+    sub.style.color = '#cbd5e1';
+    sub.style.fontSize = '18px';
+    sub.style.marginTop = '2px';
+    sub.textContent = [city,zip].filter(Boolean).join(' ');
+    summaryEl.appendChild(sub);
+  }
+  if (mappar){
+    const pill = document.createElement('div');
+    pill.style.marginTop='8px'; pill.style.display='flex'; pill.style.gap='6px'; pill.style.flexWrap='wrap';
+    const span = document.createElement('span');
+    span.className='pill'; span.textContent = mappar;
+    pill.appendChild(span); summaryEl.appendChild(pill);
+  }
+
+  if (siteAddr) rows.push(['Site Address', siteAddr]);
+  if (city)     rows.push(['City', city]);
+  if (zip)      rows.push(['Zip', zip]);
+  if (zoning)   rows.push(['Zoning', zoning]);
+  if (mappar)   rows.push(['Map/Parcel ID', mappar]);
+  if (stories)  rows.push(['Stories', stories]);
+  if (units)    rows.push(['Units', units]);
+  if (style)    rows.push(['Style', style]);
+
   attrsTable.innerHTML='';
   for(const [k,v] of rows){
     const tr=document.createElement('tr');
@@ -242,9 +348,12 @@ function renderAttributes(a){
     const td=document.createElement('td'); td.textContent=String(v);
     tr.append(th,td); attrsTable.appendChild(tr);
   }
+
+  // After attrs table is built, overlay with sheet data/photos (adds Column C above Site Address)
   showSheetJoin(a);
 }
 
+// Keep a highlight polygon for selected parcel
 let highlight=null;
 function renderFromFeature(feature){
   if(!feature) return;
@@ -252,19 +361,21 @@ function renderFromFeature(feature){
   try{ if(highlight) map.removeLayer(highlight); }catch{}
   highlight = L.geoJSON(feature,{interactive:false,style:{color:'#93c5fd',weight:3,fillColor:'#60a5fa',fillOpacity:.25}}).addTo(map);
   try{ const b=highlight.getBounds(); if(b && b.isValid()) map.fitBounds(b.pad(.25)); }catch{}
-  renderAttributes(props);
+  renderAttributes(props); // <-- shows info automatically
 }
 
-// Click on parcel → show info + preplans
+// Click on parcel → show info + sheet join
 parcelLayer.on('click',(e)=>{ if(e.originalEvent) L.DomEvent.stop(e.originalEvent); renderFromFeature(e.layer.feature); });
 
-// Search
+// -------- Search: try exact/like matches first, then geocode & snap --------
 const ST_FIELDS=['ADDRESS','SITE_ADDR','FULL_STR','LOCATION','ST_NAME','STREET','STREETNAME'];
 const esc = s => String(s).replace(/'/g,"''");
 const norm= s => String(s||'').toUpperCase().replace(/[.,#]/g,' ').replace(/\s+/g,' ').trim();
+
 function esriQuery(where,limit=6){
   return new Promise(res=>L.esri.query({url:FS_URL}).where(where).returnGeometry(true).limit(limit).run((err,fc)=>res(err?null:fc)));
 }
+
 async function addressSearch(qraw){
   const RAW=norm(qraw);
   const tries=[
@@ -283,17 +394,21 @@ async function addressSearch(qraw){
     tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS)='${street}'`);
     tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street}%'`);
     tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street.replace(/ STREET$/,' ST')}%'`);
-    tries.push(`TOWN_ID=139 AND ADDR_NUM=${num} AND UPPER(ADDRESS) LIKE '${street.replace(/ ST$/,' STREET')}%'`);
+    tries.push(`TOWN_ID=139 AND UPPER(ADDRESS) LIKE '${street.replace(/ ST$/,' STREET')}%'`);
   }
   const ors=ST_FIELDS.map(f=>`UPPER(${f}) LIKE '%${esc(RAW)}%'`).join(' OR ');
   tries.push(`TOWN_ID=139 AND (${ors})`);
 
   for(const w of tries){
     const fc=await esriQuery(w,8);
-    if(fc && fc.features && fc.features.length){ renderFromFeature(fc.features[0]); return true; }
+    if(fc && fc.features && fc.features.length){
+      renderFromFeature(fc.features[0]); // <-- show result immediately
+      return true;
+    }
   }
   return false;
 }
+
 async function geocodeAndSnap(q){
   return new Promise(resolve=>{
     const text=/hopkinton/i.test(q)?q:`${q}, Hopkinton, MA`;
@@ -302,12 +417,16 @@ async function geocodeAndSnap(q){
         if(!e && r && r.results && r.results.length){
           const ll=r.results[0].latlng; map.setView(ll,17);
           const near=await new Promise(res=>L.esri.query({url:FS_URL}).where("TOWN_ID=139").nearby(ll,18).limit(1).run((err,fc)=>res(err?null:fc)));
-          if(near && near.features && near.features.length){ renderFromFeature(near.features[0]); resolve(true); return; }
+          if(near && near.features && near.features.length){
+            renderFromFeature(near.features[0]); // <-- show result immediately
+            resolve(true); return;
+          }
         }
         resolve(false);
       });
   });
 }
+
 async function searchAndSelect(){
   const q=(addrInput.value||'').trim(); if(!q) return;
   setStatus('Searching…');
@@ -320,7 +439,7 @@ async function searchAndSelect(){
 addrBtn.onclick = searchAndSelect;
 addrInput.addEventListener('keydown',e=>{ if(e.key==='Enter') searchAndSelect(); });
 
-parcelLayer.once('load',()=>setStatus('Ready. Click a parcel or search an address.'));
+parcelLayer.once('load',()=>setStatus('Ready.'));
 </script>
 </body>
 </html>
