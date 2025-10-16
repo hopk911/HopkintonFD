@@ -1,0 +1,207 @@
+/* styles.css (cleaned)
+   - Base layout & components
+   - Single source of truth for color tokens (UPDATED palette)
+   - Full-bleed tile headers (default)
+   - Contact tile layout (text left, photos right)
+*/
+
+:root{
+  --bg:#0b1220; --panel:#111827; --muted:#9ca3af; --text:#e5e7eb; --ring:#374151;
+
+  /* Category palette (updated) */
+  --fire:#ef4444;
+  --ems:#22c55e;        /* Green */
+  --water:#0ea5e9;
+  --gas:#facc15;        /* Yellow */
+  --electric:#14b8a6;   /* Teal */
+  --hazmat:#f97316;     /* Orange */
+  --construction:#a3a3a3;
+  --elevator:#7c3aed;
+  --contact:#e5e7eb;    /* Light gray for General Contact */
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  background:var(--bg);
+  color:var(--text);
+}
+
+/* ---------- Left side nav ---------- */
+.side-nav{
+  position:fixed; inset:0 auto 0 0; width:52px;
+  display:flex; flex-direction:column; gap:10px; align-items:center;
+  padding:10px 6px;
+  background:rgba(255,255,255,.04);
+  border-right:1px solid var(--ring);
+  backdrop-filter:saturate(180%) blur(6px);
+  z-index:20;
+}
+.nav-btn{
+  display:grid; place-items:center;
+  width:36px; height:36px; border-radius:9px;
+  color:#0b1220; text-decoration:none;  /* text color is set per theme when needed */
+}
+.nav-btn:hover{ filter:brightness(1.05); }
+
+.content{ margin-left:52px; padding:18px 18px 60px; }
+
+/* ---------- Header / intro ---------- */
+.page-header{
+  position:relative; display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:12px; gap:12px; flex-wrap:wrap;
+}
+.page-header h1{ font-size:clamp(20px, 2.2vw, 28px); font-weight:700; margin:0; }
+
+.intro{ display:grid; grid-template-columns: 1fr min(340px, 38%); gap:14px; align-items:start; }
+.card{
+  background:var(--panel); border:1px solid var(--ring);
+  border-radius:14px; overflow:hidden;
+}
+.card-title{ margin:0; padding:12px 14px; font-size:16px; border-bottom:1px solid var(--ring); color:#fff; }
+.card-body{ padding:12px 14px; }
+.kv{ display:grid; grid-template-columns: max-content 1fr; gap:8px 12px; }
+.kv .k{ color:var(--muted); }
+.kv .v{ color:#fff; }
+
+/* ---------- Map ---------- */
+.mini-map{ position:relative; height:240px; }
+#map{ height:100%; border:1px solid var(--ring); border-radius:12px; }
+.map-note{
+  position:absolute; inset:auto 8px 8px 8px; font-size:12px; color:var(--muted);
+  background:rgba(0,0,0,.35); padding:6px 8px; border-radius:8px;
+}
+
+/* ---------- Tiles grid ---------- */
+.tiles{ display:grid; grid-template-columns: repeat(2, 1fr); gap:14px; margin-top:16px; }
+
+/* Tile container: full-bleed headers by default */
+.tile{
+  border-radius:14px; overflow:hidden;
+  background:var(--panel);
+  border:1px solid var(--ring);
+  padding:0;              /* no inset; header will touch edges */
+}
+.tile-head{
+  padding:0;              /* no extra padding wrapper */
+  border-bottom:1px solid var(--ring);
+}
+.tile-title{
+  margin:0; font-size:15px; font-weight:700;
+  display:block; width:100%;
+  padding:12px 16px;      /* inner spacing of the header bar */
+}
+.tile-body{ padding:12px; display:grid; gap:8px; }
+.tile .row{ display:grid; grid-template-columns: max-content 1fr; gap:6px 10px; }
+.tile .k{ color:var(--muted); }
+.tile .v{ color:#fff; }
+
+/* Optional left border accents (kept) */
+.tile.fire{ border-left:5px solid var(--fire); }
+.tile.ems{ border-left:5px solid var(--ems); }
+.tile.water{ border-left:5px solid var(--water); }
+.tile.gas{ border-left:5px solid var(--gas); }
+.tile.electric{ border-left:5px solid var(--electric); }
+.tile.hazmat{ border-left:5px solid var(--hazmat); }
+.tile.construction{ border-left:5px solid var(--construction); }
+.tile.elevator{ border-left:5px solid var(--elevator); }
+
+/* Thumbnails block used by some cards */
+.thumbs{ display:flex; gap:8px; flex-wrap:wrap; padding:0 12px 12px; }
+.thumb{
+  width:72px; height:56px; border-radius:8px; overflow:hidden;
+  border:1px solid var(--ring); background:#0f172a;
+  display:grid; place-items:center; cursor:pointer;
+}
+.thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+.thumb.broken{ background:#111827; border-style:dashed; position:relative; }
+.thumb.broken::after{
+  content:"No Photo"; font-size:11px; color:#9ca3af;
+  position:absolute; inset:auto 6px 6px 6px; text-align:center;
+}
+
+/* ---------- Search ---------- */
+.search{ display:flex; gap:8px; align-items:center; margin-left:auto; position:relative; }
+.search-input{
+  min-width: min(44vw,480px); max-width: 70vw;
+  padding:8px 10px; border-radius:10px; border:1px solid var(--ring);
+  background:#0f172a; color:#fff;
+}
+.search-btn{
+  padding:8px 12px; border-radius:10px; border:1px solid var(--ring);
+  background:#0f172a; color:#fff; cursor:pointer;
+}
+.search-btn:hover{ background:#111827; }
+.search-results{
+  position:absolute; top:100%; left:0; margin-top:8px;
+  background:#0b1220; border:1px solid var(--ring); border-radius:10px;
+  width:min(520px, 80vw); max-height:50vh; overflow:auto; display:none; z-index:30;
+}
+.search-item{ padding:8px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.06); }
+.search-item:last-child{ border-bottom:none; }
+.search-item:hover{ background:#111827; }
+.search-select{
+  padding:8px 10px; border-radius:10px; border:1px solid var(--ring);
+  background:#0f172a; color:#fff; max-width:min(42vw,380px);
+}
+
+/* === General Contact: photo inline with text; stacks below on small screens === */
+#contact > .tile-body{
+  display: grid;
+  grid-template-columns: 1fr 360px;  /* left = text, right = photo(s) */
+  align-items: start;                /* align photo to the top of the text */
+  column-gap: 20px;
+}
+
+#contact-kv{
+  min-width: 300px;
+}
+
+#contact-photos{
+  justify-self: end;                 /* keep photos snug to the right edge */
+  align-self: start;                 /* top-aligned with the text */
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+/* one nice wide image; tweak if you prefer smaller */
+#contact-photos .thumb{
+  width: 340px;
+  height: 210px;
+  border-radius: 12px;
+}
+
+/* Responsive: drop photos below the text when the screen shrinks */
+@media (max-width: 1000px){
+  #contact > .tile-body{
+    grid-template-columns: 1fr;      /* single column */
+    row-gap: 12px;
+  }
+  #contact-photos{
+    justify-self: start;             /* align left when stacked */
+    justify-items: start;
+  }
+  #contact-photos .thumb{
+    width: 100%;
+    max-width: 420px;                /* keeps it from getting too huge */
+    height: auto;
+    aspect-ratio: 16 / 10;           /* consistent shape on phones */
+  }
+}
+
+/* Responsive */
+@media (max-width: 980px){
+  .intro{ grid-template-columns: 1fr; }
+  .mini-map{ order:2; height:220px; }
+}
+@media (max-width: 720px){
+  .tiles{ grid-template-columns: 1fr; }
+  .side-nav{ width:44px; }
+  .content{ margin-left:44px; }
+  .nav-btn{ width:32px; height:32px; }
+  #contact > .tile-body{ flex-direction:column; align-items:stretch; }
+  #contact-photos{ width:auto; justify-content:flex-start; }
+}
