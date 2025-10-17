@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <link rel="icon" href="data:,">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HFD Pre-Plan Overview</title>
@@ -44,7 +45,6 @@
   <main class="content">
     <header class="page-header">
       <form id="search-form" class="search" role="search" autocomplete="off">
-        <select id="address-select" class="search-select" aria-label="Choose a site"></select>
         <input id="search-input" class="search-input" placeholder="Search address or business..." aria-label="Search address or business" />
         <button class="search-btn" type="submit" aria-label="Search">Search</button>
         <div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div>
@@ -52,19 +52,15 @@
       <h1 id="page-title">Pre-Plan</h1>
     </header>
 
-    <section class="intro">
-      <div class="card" id="contact-card" aria-labelledby="contact-title">
-        <h2 class="card-title" id="contact-title">General Contact</h2>
-        <div class="card-body" id="contact-body">
-          <div class="kv" id="contact-kv"></div>
-          <div id="contact-photos" class="thumbs"></div>
-        </div>
-      </div>
-      <div class="mini-map">
-        <div id="map" aria-label="Parcel Map"></div>
-        <div class="map-note" id="map-note">Parcel outline will appear here when GIS is configured.</div>
-      </div>
-    </section>
+<!-- Title + search stay as-is -->
+
+<!-- General Contact + Map -->
+<section class="intro" id="intro" hidden>
+  <!-- your General Contact tile + map wrapper live here -->
+  <div id="map-wrapper" hidden>
+    <div id="map" aria-label="Parcel Map"></div>
+  </div>
+</section>
 
     <section class="tiles">
       <article class="tile fire" id="fire" aria-labelledby="fire-title">

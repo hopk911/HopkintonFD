@@ -1,4 +1,42 @@
-// app.js — photos once, water keywords adjusted, colored UI hooks compatible, improved modal UX
+// --- helpers to guarantee General Information + contact-body exist ---
+function ensureGeneralInfo(){
+  var gi = document.getElementById('general-info');
+  if (!gi){
+    gi = document.createElement('section');
+    gi.id = 'general-info';
+    gi.className = 'tile';
+    gi.innerHTML = '<div class="tile-header"><h2>General Information</h2></div><div class="tile-body" id="contact-body"></div>';
+    var panel = document.getElementById('results-panel');
+    if (panel && panel.parentNode){ panel.parentNode.insertBefore(gi, panel.nextSibling); }
+    else { document.body.appendChild(gi); }
+  }
+  if (gi.classList.contains('hidden')) gi.classList.remove('hidden');
+  return gi;
+}
+function getContactBody(){
+  var gi = ensureGeneralInfo();
+  contactBody = gi.querySelector('#contact-body');
+  if (!contactBody){
+    contactBody = document.createElement('div');
+    contactBody.id = 'contact-body';
+    contactBody.className = 'tile-body';
+    gi.appendChild(contactBody);
+  }
+  if (!contactBody.prepend){
+    contactBody.prepend = function(node){ if(this.firstChild){ this.insertBefore(node, this.firstChild); } else { this.appendChild(node); } };
+  }
+  return contactBody;
+}
+// --- end helpers ---
+// ---- Local SAMPLE_DATA fallback (for offline/testing when sheet URL fails) ----
+const SAMPLE_DATA = [
+  {"Business Name":"Sample Plaza","Street Address":"73 Main Street","City":"Hopkinton","Latitude":"42.2292","Longitude":"-71.5187","Knox Box Location":"Alpha Side – center of building","Primary Contact":"Fire Chief Jones","Primary Phone":"5085551212","Closest Hydrant":"Corner of Main & Park","Electric Panel Location":"Rear hallway by loading dock","Gas Meter Location":"Bravo side exterior","Water Shutoff":"Basement mechanical room","FDC":"Delta side, two 2.5\" inlets","Alarm Panel":"Lobby next to office","Photo 1":"https://picsum.photos/seed/preplan1/800/500"},
+  {"Business Name":"Ace Manufacturing","Street Address":"276 West Main Street","City":"Hopkinton","Latitude":"42.2301","Longitude":"-71.5169","Primary Contact":"Site Manager","Primary Phone":"6175551212","Gas Meter":"Charlie side cage","Sprinkler Riser":"Mechanical mezzanine","Generator":"Pad outside Bravo","Photo 1":"https://picsum.photos/seed/preplan2/800/500"}
+];
+// ---- end SAMPLE_DATA ----
+
+// app.js — results table (no dropdown) + search + pagination + show tiles on selection
+// retains resilient photos, modal UX, GIS, and tile routing from prior builds
 
 // ---- Global config ----
 var SHEET_URL = window.GOOGLE_SHEET_JSON_URL;
@@ -20,6 +58,27 @@ function addRow(container, k, v){
 }
 
 // ---- Flexible field getters ----
+
+
+// --- Robust header lookup helpers ---
+function normKey(k){ return String(k||'').replace(/\s+/g,' ').trim().toLowerCase(); }
+function getByHeaders(row, headers){
+  if (!row) return '';
+  const lut = {};
+  try{ Object.keys(row).forEach(k=>{ lut[normKey(k)] = k; }); }catch{}
+  for(const h of headers){
+    const nk = normKey(h);
+    if (lut[nk] && row[lut[nk]]!=null && String(row[lut[nk]]).trim()!=='') return String(row[lut[nk]]).trim();
+  }
+  return '';
+}
+
+function getBusinessName(row){
+  return getByHeaders(row,[
+    'Business Name','Business','DBA','Name','Site Name','Location Name','Occupancy Name'
+  ]);
+}
+
 function firstNonEmpty(row, candidates, contains=false){
   for(const key of candidates){ if(row[key] && String(row[key]).trim()!=='') return String(row[key]).trim(); }
   if(contains){
@@ -40,8 +99,7 @@ function getCity(row){
 const CATEGORY_MAP = [
   {cat:'fire', keys:['alarm','fire pump','sprinkler','standpipe','fdc']},
   {cat:'ems', keys:['defibrillator','aed','medical','med']},
-  // Water (removed 'shutoff' and 'main shutoff' per request)
-  {cat:'water', keys:['water','hydrant']},
+  {cat:'water', keys:['water','hydrant']}, // 'shutoff' removed
   {cat:'gas', keys:['gas','propane','lng','cng','meter']},
   {cat:'electric', keys:['electric','electrical','panel','disconnect','generator']},
   {cat:'hazmat', keys:['hazmat','haz-mat','hazard','tank','combustible','flammable','oxidizer','corrosive']},
@@ -74,11 +132,10 @@ function driveCandidates(id) {
   return [
     `https://drive.google.com/uc?export=view&id=${id}`,
     `https://drive.google.com/uc?export=download&id=${id}`,
-    `https://drive.google.com/thumbnail?id=${id}&sz=w800`
+    `https://drive.google.com/thumbnail?id=${id}&sz=w1000`
   ];
 }
 function normalizeImageCandidates(u) {
-  // Return only the original URL; fallbacks are attempted internally so we render one thumb.
   if (!u) return [];
   return [String(u).trim()];
 }
@@ -88,15 +145,10 @@ function splitMaybeList(v){
   if (parts.length === 1) return v.split(/\s*,\s*/g);
   return parts.map(s => s.trim()).filter(Boolean);
 }
-function cleanCaption(c){
-  return String(c || '')
-    .replace(/\bphoto\b\s*:?/i, '')
-    .trim();
-}
+function cleanCaption(c){ return String(c || '').replace(/\bphoto\b\s*:?/i, '').trim(); }
 function addThumb(container, src, caption){
   if (!container) return;
   const items = splitMaybeList(src).flatMap(normalizeImageCandidates).filter(Boolean);
-
   items.forEach(rawUrl => {
     const wrap = document.createElement('div');
     wrap.className = 'thumb';
@@ -105,30 +157,16 @@ function addThumb(container, src, caption){
     img.referrerPolicy = 'no-referrer';
     const nice = cleanCaption(caption);
     img.alt = nice || 'Image';
-
     const chain = [rawUrl];
     const id = driveIdsFromUrl(rawUrl);
-    if (id) {
-      driveCandidates(id).forEach(u => { if (!chain.includes(u)) chain.push(u); });
-    }
-
+    if (id) driveCandidates(id).forEach(u => { if (!chain.includes(u)) chain.push(u); });
     let idx = 0;
-    function tryNext(){
-      if (idx >= chain.length) { wrap.classList.add('broken'); img.remove(); return; }
-      img.src = chain[idx++];
-    }
-    img.onerror = tryNext;
-    tryNext();
-
-    wrap.append(img);
-    container.append(wrap);
-
+    function tryNext(){ if (idx >= chain.length){ wrap.classList.add('broken'); img.remove(); return; } img.src = chain[idx++]; }
+    img.onerror = tryNext; tryNext();
+    wrap.append(img); container.append(wrap);
     wrap.addEventListener('click', () => {
-      if (img && img.complete && img.naturalWidth > 0) {
-        openModal(img.src, nice);
-      } else {
-        window.open(chain[0], '_blank', 'noopener');
-      }
+      if (img && img.complete && img.naturalWidth > 0) openModal(img.src, nice);
+      else window.open(chain[0], '_blank', 'noopener');
     });
   });
 }
@@ -139,7 +177,6 @@ const modalImg = document.getElementById('modal-img');
 const modalCap = document.getElementById('modal-caption');
 const modalClose = document.getElementById('modal-close');
 const modalInner = document.querySelector('#img-modal .modal-inner');
-
 function openModal(src, caption){
   if(!modal) return;
   modalImg.src = src; 
@@ -147,16 +184,12 @@ function openModal(src, caption){
   if(!modal.open) modal.showModal();
 }
 if(modalClose) modalClose.addEventListener('click',()=>modal.close());
-
-// Close when clicking outside the card
-if (modal) {
-  modal.addEventListener('click', (e) => {
-    if (!modalInner) return;
-    const r = modalInner.getBoundingClientRect();
-    const outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
-    if (outside) modal.close();
-  });
-}
+if (modal) modal.addEventListener('click', (e) => {
+  if (!modalInner) return;
+  const r = modalInner.getBoundingClientRect();
+  const outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+  if (outside) modal.close();
+});
 
 // ---- Map (Leaflet + Esri) ----
 let map = L.map('map',{zoomControl:false});
@@ -183,67 +216,227 @@ function highlightParcelSmart(parcelId, lat, lng){
   }catch(e){ console.warn('Parcel layer not available:', e); }
 }
 
-// ---- Search + select ----
+// ---- Search table (replaces dropdown) ----
 let ALL_ROWS = []; let CURRENT_INDEX = -1;
+let IDX = [];         // {i,label,addr,city,name,parcel, hay}
+let FILTERED = [];    // filtered IDX
+let PAGE = 1;
+const PAGE_SIZE = 25;
+
 function normalizeAddress(s){ return String(s||'').toLowerCase().trim(); }
-function buildSearchIndex(rows){
-  return rows.map((r,i)=>{
-    const addr=getAddress(r), city=getCity(r);
+
+function makeIndex(rows){
+  IDX = rows.map((r,i)=>{
+    const addr=getAddress(r);
+    const city=getCity(r);
     const name=firstNonEmpty(r,['Business Name','Site Name','Location Name']);
     const parcel=firstNonEmpty(r,['LOC_ID','Map/Parcel','MAP_PARCEL','Parcel']);
-    const label = addr ? [addr,city].filter(Boolean).join(', ') : (name || parcel || '(untitled)');
-    return { i, label, hay:[addr,city,name,parcel].join(' ').toLowerCase() };
+    const label = addr ? (city ? addr+', '+city : addr) : (name || parcel || '(untitled)');
+    return { i, label, addr:addr||'', city:city||'', name:name||'', parcel:parcel||'', hay:[addr,city,name,parcel].join(' ').toLowerCase() };
+  });
+  // Alphabetize for easier scan
+  IDX.sort((a,b)=>a.label.localeCompare(b.label));
+  FILTERED = IDX.slice();
+}
+
+function ensureResultsUI(){
+  // Hide the old dropdown and the floating results list if present
+  const sel = document.getElementById('address-select'); if (sel) sel.style.display='none';
+  const old = document.getElementById('search-results'); if (old) old.style.display='none';
+
+  if (document.getElementById('results-panel')) return;
+  const header = document.querySelector('.page-header') || document.querySelector('header');
+  const panel = el('div', 'results-panel');
+  panel.id = 'results-panel';
+  panel.innerHTML = `
+    <div class="results-head">
+      <div class="results-meta"><span id="results-count"></span></div>
+      <div class="results-pager">
+        <button id="res-prev" type="button" aria-label="Previous">◀</button>
+        <span id="res-page">1</span>
+        <button id="res-next" type="button" aria-label="Next">▶</button>
+      </div>
+    </div>
+    <div class="results-wrap">
+      <table id="results-table"><thead>
+        <tr><th>Address</th><th>City</th><th>Name</th><th>Parcel</th><th></th></tr>
+      </thead><tbody></tbody></table>
+    </div>`;
+  (header && header.after) ? header.after(panel) : document.body.prepend(panel);
+
+  // Minimal styling injection to match theme
+  if (!document.getElementById('results-table-css')) {
+    const css = document.createElement('style');
+    css.id = 'results-table-css';
+    css.textContent = `
+      .results-panel{margin:8px 0 14px; background:var(--panel); border:1px solid var(--ring); border-radius:12px; overflow:hidden;}
+      .results-head{display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid var(--ring);}
+      .results-meta{font-size:12px; color:var(--muted);}
+      .results-pager{display:flex; gap:8px; align-items:center;}
+      .results-pager button{background:#0f172a; color:#fff; border:1px solid var(--ring); border-radius:8px; padding:6px 10px; cursor:pointer;}
+      .results-wrap{overflow:auto; max-height:44vh;}
+      #results-table{width:100%; border-collapse:collapse; font-size:14px;}
+      #results-table th,#results-table td{padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); text-align:left;}
+      #results-table tbody tr{cursor:pointer;}
+      #results-table tbody tr:hover{background:#111827;}
+      #results-table td:last-child{width:1%; white-space:nowrap;}
+      .open-btn{background:#111827; color:#fff; border:1px solid var(--ring); border-radius:8px; padding:6px 10px; cursor:pointer;}
+      @media (max-width:720px){ #results-table th:nth-child(3), #results-table td:nth-child(3){display:none;} }
+    `;
+    document.head.appendChild(css);
+  }
+
+  document.getElementById('res-prev').addEventListener('click', ()=>{ if(PAGE>1){ PAGE--; renderResults(); } });
+  document.getElementById('res-next').addEventListener('click', ()=>{
+    const max = Math.max(1, Math.ceil(FILTERED.length / PAGE_SIZE));
+    if(PAGE < max){ PAGE++; renderResults(); }
   });
 }
-function renderSearchResults(items){
-  const box=document.getElementById('search-results'); if(!box) return;
-  box.innerHTML=''; if(!items.length){ box.style.display='none'; return; }
-  items.slice(0,25).forEach(it=>{
-    const div=el('div','search-item',it.label);
-    div.addEventListener('click',()=>{ loadRow(it.i); box.style.display='none'; });
-    box.append(div);
+
+function renderResults(){
+  ensureResultsUI(); hideIntro(); updateNavOffset();
+  const tb = document.querySelector('#results-table tbody');
+  const count = document.getElementById('results-count');
+  const pageLbl = document.getElementById('res-page');
+  if (!tb) return;
+  const max = Math.max(1, Math.ceil(FILTERED.length / PAGE_SIZE));
+  if (PAGE > max) PAGE = max;
+
+  const start = (PAGE-1) * PAGE_SIZE;
+  const end = Math.min(start + PAGE_SIZE, FILTERED.length);
+  let html = '';
+  for (let k=start; k<end; k++){
+    const it = FILTERED[k];
+    html += `<tr data-i="${it.i}">
+      <td>${it.addr || it.label}</td>
+      <td>${it.city || ''}</td>
+      <td>${it.name || ''}</td>
+      <td>${it.parcel || ''}</td>
+      <td><button class="open-btn" data-i="${it.i}">Open</button></td>
+    </tr>`;
+  }
+  tb.innerHTML = html;
+  count.textContent = `${FILTERED.length} site${FILTERED.length===1?'':'s'}`;
+  pageLbl.textContent = `${PAGE}/${max}`;
+
+  // Row/btn selection
+  tb.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', (e) => {
+      const i = parseInt(tr.getAttribute('data-i'),10);
+      if (Number.isInteger(i)) selectRow(i);
+    });
   });
-  box.style.display='block';
+  tb.querySelectorAll('.open-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const i = parseInt(btn.getAttribute('data-i'),10);
+      if (Number.isInteger(i)) selectRow(i);
+    });
+  });
 }
-function attachSearch(rows){
+
+function selectRow(i){
+  ensureGeneralInfo();
+  getContactBody();
+
+  loadRow(i);
+  showIntro && showIntro();
+  showTiles && showTiles();
+  const contact = document.getElementById('contact-card');
+  if (contact) { contact.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+}
+
+function updateNavOffset(){
+  try {
+    const panel = document.getElementById('results-panel');
+    const nav = document.querySelector('.side-nav');
+    if (!panel || !nav) return;
+    const rect = panel.getBoundingClientRect();
+    const top = Math.max(0, Math.round(rect.top + window.scrollY - 8));
+    document.documentElement.style.setProperty('--nav-top', top + 'px');
+  } catch (e) {}
+}
+window.addEventListener('resize', updateNavOffset);
+
+function attachSearchTable(rows){
   const form=document.getElementById('search-form');
   const input=document.getElementById('search-input');
-  const results=document.getElementById('search-results');
-  if(!form||!input||!results) return;
-  const idx=buildSearchIndex(rows);
+  if(!form||!input) return;
+  makeIndex(rows);
+  ensureResultsUI();
+  renderResults();
+
+  // Filter on input
   input.addEventListener('input',()=>{
-    const q=normalizeAddress(input.value);
-    if(!q){ results.style.display='none'; return; }
-    renderSearchResults(idx.filter(it => it.hay.includes(q)));
+    const q = normalizeAddress(input.value);
+    if (!q){ FILTERED = IDX.slice(); PAGE = 1; renderResults(); return; }
+    FILTERED = IDX.filter(it => it.hay.includes(q));
+    PAGE = 1;
+    renderResults();
   });
+
+  // Submit picks the first visible
   form.addEventListener('submit',(e)=>{
     e.preventDefault();
-    const q=normalizeAddress(input.value);
-    const m=idx.filter(it=>it.hay.includes(q));
-    if(m.length) loadRow(m[0].i);
+    if (FILTERED.length) selectRow(FILTERED[0].i);
   });
 }
-function buildAddressSelect(rows){
-  const sel=document.getElementById('address-select'); if(!sel) return;
-  sel.innerHTML=''; sel.append(new Option('Choose a site…',''));
-  rows.forEach((r,i)=>{
-    const addr=getAddress(r), city=getCity(r);
-    const parcel=firstNonEmpty(r,['LOC_ID','Map/Parcel','MAP_PARCEL','Parcel']);
-    const label = addr ? [addr,city].filter(Boolean).join(', ') : (parcel || '(untitled)');
-    sel.append(new Option(label,String(i)));
-  });
-  sel.addEventListener('change',()=>{ const i=parseInt(sel.value); if(Number.isInteger(i)) loadRow(i); });
+
+
+// ---- Show/Hide the header intro (contact card + mini map) ----
+function hideIntro(){
+  const intro = document.querySelector('.intro');
+  if (intro) intro.style.display = 'none';
+}
+function showIntro(){
+  const intro = document.querySelector('.intro');
+  if (intro) intro.style.display = 'grid';
+}
+
+// ---- Hide/Show tiles -----
+function hideTiles(){
+  const t = document.querySelector('.tiles');
+  if (t) t.style.display = 'none';
+}
+function showTiles(){
+  const t = document.querySelector('.tiles');
+  if (t) t.style.display = 'grid';
 }
 
 // ---- Load + render ----
 function clearContainers(){
-  ['contact-kv','contact-photos','fire-body','fire-photos','ems-body','ems-photos','water-body','water-photos','gas-body','gas-photos','electric-body','electric-photos','hazmat-body','hazmat-photos','construction-body','construction-photos','elevator-body','elevator-photos']
-    .forEach(id => { const n=document.getElementById(id); if(n) n.innerHTML=''; });
+  const nm = document.getElementById('contact-name');
+  if (nm) nm.textContent = '';
+
+  [
+    'contact-kv','contact-photos',
+    'fire-body','fire-photos',
+    'ems-body','ems-photos',
+    'water-body','water-photos',
+    'gas-body','gas-photos',
+    'electric-body','electric-photos',
+    'hazmat-body','hazmat-photos',
+    'construction-body','construction-photos',
+    'elevator-body','elevator-photos'
+  ].forEach(id => {
+    const n = document.getElementById(id);
+    if (n) n.innerHTML = '';
+  });
 }
-function looksLikeImage(val){ return /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(String(val)); }
+
+
 
 function loadRow(i){
-  CURRENT_INDEX = i; const r = ALL_ROWS[i]; if(!r) return;
+function looksLikeImage(val){ return /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(String(val)); }
+
+  var contactBody = getContactBody();
+
+  CURRENT_INDEX = i; const r = ALL_ROWS[i];
+  
+  const nm = document.getElementById('contact-name'); if (nm) nm.textContent = getBusinessName(r) || '';
+const nameEl = document.getElementById('contact-name');
+  if (nameEl) nameEl.textContent = r['Business Name'] || r['Name'] || r['Site Name'] || '';
+ if(!r) return;
 
   document.getElementById('page-title').textContent =
     firstNonEmpty(r, ['Business Name','Site Name','Location Name','Address','Street Address'], 'address') || 'Pre-Plan';
@@ -251,7 +444,7 @@ function loadRow(i){
   clearContainers();
 
   // Ensure contact containers exist
-  const contactBody=document.getElementById('contact-body');
+  contactBody = document.getElementById('contact-body');
   let contactKV=document.getElementById('contact-kv');
   let contactPhotos=document.getElementById('contact-photos');
   if(!contactKV){ contactKV=el('div','kv'); contactKV.id='contact-kv'; contactBody.prepend(contactKV); }
@@ -313,8 +506,9 @@ function loadRow(i){
   highlightParcelSmart(parcel,lat,lng);
 }
 
-// ---- Initialize (robust) ----
+// ---- Initialize ----
 (async function initAll(){
+  hideTiles();
   if(!SHEET_URL){ console.error('SHEET_URL missing'); return; }
   try{
     const res = await fetch(SHEET_URL, {mode:'cors', cache:'no-store'});
@@ -327,11 +521,11 @@ function loadRow(i){
                  (json && json.result && Array.isArray(json.result)) ? json.result : [];
     if(!rows.length) throw new Error('No data in sheet response');
     ALL_ROWS = rows;
-    attachSearch(rows);
-    buildAddressSelect(rows);
+    attachSearchTable(rows);
   }catch(err){
     console.error('Failed to load sheet data:', err);
-    const box=document.getElementById('search-results');
-    if(box){ box.innerHTML = `<div class="search-item">Data load failed: ${String(err.message||err)}</div>`; box.style.display='block'; }
+    ensureResultsUI();
+    const tb = document.querySelector('#results-table tbody');
+    if (tb) tb.innerHTML = `<tr><td colspan="5">Data load failed: ${String(err.message||err)}</td></tr>`;
   }
 })();
