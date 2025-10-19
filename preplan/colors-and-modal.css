@@ -45,7 +45,6 @@
 #modal-close:hover{ filter:brightness(0.95); }
 
 /* --------- Thumbnails (modal-trigger) --------- */
-.thumb{ width:96px; height:72px; border-radius:10px; background: rgba(255,255,255,.06);
-  display:grid; place-items:center; overflow:hidden; cursor:pointer; }
+/* (removed duplicate .thumb — using styles.css version) */
 .thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
 .thumb.broken::before{ content:"No Photo"; font-size:.75rem; color:#999; }

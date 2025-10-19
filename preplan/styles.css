@@ -205,3 +205,7 @@ body{
   #contact > .tile-body{ flex-direction:column; align-items:stretch; }
   #contact-photos{ width:auto; justify-content:flex-start; }
 }
+
+/* Edit modal form helpers */
+#edit-form label{display:block;margin:10px 0;}
+#edit-form input,#edit-form textarea{width:100%;}

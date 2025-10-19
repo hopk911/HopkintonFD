@@ -47,8 +47,7 @@
       <form id="search-form" class="search" role="search" autocomplete="off">
         <input id="search-input" class="search-input" placeholder="Search address or business..." aria-label="Search address or business" />
         <button class="search-btn" type="submit" aria-label="Search">Search</button>
-        <div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div>
-      </form>
+</form>
       <h1 id="page-title">Pre-Plan</h1>
     </header>
 
@@ -108,16 +107,59 @@
 
   <!-- Simple image popup -->
   <dialog class="img-modal" id="img-modal">
+  <div class="modal-inner">
+
     <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
     <img id="modal-img" alt="Preview" />
     <div id="modal-caption" class="modal-caption"></div>
-  </dialog>
+  
+  </div>
+</dialog>
 
-  <!-- Inline config MUST come before app.js -->
-  <script>
-    window.GOOGLE_SHEET_JSON_URL = "https://script.google.com/macros/s/AKfycbw03c7Rrm_7oweQJUiprYdF5FXDzRRiYO3WjI97Nezq-D1GOQ69UPzRZNibGai7WL52Rg/exec";
-    window.PARCEL_FEATURE_LAYER_URL = "https://services1.arcgis.com/hGdibHYSPO59RG1h/arcgis/rest/services/L3_TAXPAR_POLY_ASSESS_gdb/FeatureServer/0";
-  </script>
-  <script src="app.js"></script>
+<!-- Inline config MUST come before app.js -->
+<script>
+  window.WEBAPP_URL            = 'https://script.google.com/macros/s/AKfycbyzmWnMBjjbyVmlEzBkRcPsN5bnwfKR06iDxMzpVDkVNrrJy7E2zRy3Sj_nK8dzWAJSAA/exec';
+  window.GOOGLE_SHEET_JSON_URL = 'https://script.google.com/macros/s/AKfycbyzmWnMBjjbyVmlEzBkRcPsN5bnwfKR06iDxMzpVDkVNrrJy7E2zRy3Sj_nK8dzWAJSAA/exec';
+  window.EDIT_SECRET           = '87s3f8yh3ms8yhmd38tyhm3dtgshms83yshgmhyc83yhmtg';
+  // Optional: if you deploy the Drive Image Proxy, paste the /exec URL here.
+  // When present, images from Google Drive will load through the proxy first,
+  // eliminating 403s from uc? links.
+window.DRIVE_IMG_PROXY = 'https://script.google.com/macros/s/YOUR_DEPLOY_ID/exec?mode=photo';
+</script>
+<script src="app.js"></script>
+
+
+
+<!-- Edit Row Modal -->
+<dialog id="edit-modal" class="img-modal">
+  <div class="modal-inner">
+    <header class="modal__header">
+      <h3 class="tile-title" id="edit-title">Edit Row</h3>
+      <button type="button" id="edit-close" aria-label="Close">✕</button>
+    </header>
+    <div class="modal__body">
+      <form id="edit-form">
+        <input type="hidden" name="id" id="edit-id">
+        <label>Business Name
+          <input name="Business Name" id="edit-business" required>
+        </label>
+        <label>Site Address
+          <input name="Site Address" id="edit-address">
+        </label>
+        <label>Phone
+          <input name="Phone" id="edit-phone">
+        </label>
+        <label>Notes
+          <textarea name="Notes" id="edit-notes" rows="4"></textarea>
+        </label>
+        <div class="modal__footer" style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;">
+          <button type="button" id="edit-cancel">Cancel</button>
+          <button type="submit" id="edit-save">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</dialog>
+
 </body>
 </html>
