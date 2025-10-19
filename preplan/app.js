@@ -115,13 +115,36 @@ function driveIdsFromUrl(url) {
   } catch { return null; }
 }
 function driveCandidates(id) {
-  return [
-    `https://drive.google.com/uc?export=view&id=${id}`,
-    `https://drive.google.com/uc?export=download&id=${id}`,
-    `https://drive.google.com/thumbnail?id=${id}&sz=w1000`
-  ];
+  const chain = [];
+  try {
+    var proxy = (window && window.DRIVE_IMG_PROXY)
+      ? String(window.DRIVE_IMG_PROXY).replace(/\/$/, '')
+      : '';
+    if (proxy && id) {
+      chain.push(
+        proxy + (proxy.indexOf('?') >= 0 ? '&' : '?') +
+        'id=' + encodeURIComponent(id) + '&w=1600'
+      );
+    }
+  } catch (e) {}
+
+  // Clean, low-noise fallback that rarely 403s
+  chain.push(
+    'https://drive.google.com/thumbnail?id=' +
+    encodeURIComponent(id) + '&sz=w1000'
+  );
+  return chain;
 }
-function splitMaybeList(v){ if (typeof v !== 'string') return [v]; const parts = v.split(/[\n;]|,(?=\s*https?:)/g); if (parts.length === 1) return v.split(/\s*,\s*/g); return parts.map(s => s.trim()).filter(Boolean); }
+
+
+
+function splitMaybeList(v){
+  if (typeof v !== 'string') return [];
+  const s = v.trim();
+  if (!s) return [];
+  const parts = s.includes('|') ? s.split('|') : s.split(/\s*,\s*/g);
+  return parts.map(s => s.trim()).filter(Boolean);
+}
 function cleanCaption(c){ return String(c || '').replace(/\bphoto\b\s*:?/i, '').trim(); }
 function addThumb(container, src, caption){
   if (!container) return;
