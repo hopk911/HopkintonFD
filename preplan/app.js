@@ -3,7 +3,7 @@
 // ==============================
 
 // ---- Global config ----
-var SHEET_URL  = window.GOOGLE_SHEET_JSON_URL || window.WEBAPP_URL || '';
+var SHEET_URL  = window.GOOGLE_SHEET_JSON_URL || '';
 var PARCEL_URL = window.PARCEL_FEATURE_LAYER_URL || '';
 const WEBAPP_URL = window.WEBAPP_URL || '';
 const EDIT_SECRET = window.EDIT_SECRET || '';
@@ -19,12 +19,14 @@ function loadJSONP(url) {
   return new Promise((resolve, reject) => {
     if (!url) return reject(new Error('Missing URL'));
     const cb = `__jsonp_cb_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    window[cb] = (payload) => {
-      try { resolve(payload); }
-      finally { delete window[cb]; script.remove(); }
-    };
+    window[cb] = (payload) => { try { resolve(payload); } finally { delete window[cb]; script.remove(); } };
+
     const script = document.createElement('script');
-    script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cb;
+    const isGviz = /\/gviz\/tq/i.test(url);
+    const sep = url.includes('?') ? '&' : '?';
+    script.src = isGviz
+      ? `${url}${sep}tqx=out:json;responseHandler:${cb}`
+      : `${url}${sep}callback=${cb}`;
     script.onerror = () => { delete window[cb]; reject(new Error('JSONP load failed')); };
     document.head.appendChild(script);
   });
@@ -114,6 +116,7 @@ function driveIdsFromUrl(url) {
     return id || null;
   } catch { return null; }
 }
+
 function driveCandidates(id) {
   const chain = [];
   try {
@@ -121,23 +124,12 @@ function driveCandidates(id) {
       ? String(window.DRIVE_IMG_PROXY).replace(/\/$/, '')
       : '';
     if (proxy && id) {
-      chain.push(
-        proxy + (proxy.indexOf('?') >= 0 ? '&' : '?') +
-        'id=' + encodeURIComponent(id) + '&w=1600'
-      );
+      chain.push(proxy + (proxy.indexOf('?') >= 0 ? '&' : '?') + 'id=' + encodeURIComponent(id) + '&w=1600');
     }
   } catch (e) {}
-
-  // Clean, low-noise fallback that rarely 403s
-  chain.push(
-    'https://drive.google.com/thumbnail?id=' +
-    encodeURIComponent(id) + '&sz=w1000'
-  );
+  chain.push('https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w1000');
   return chain;
 }
-
-
-
 function splitMaybeList(v){
   if (typeof v !== 'string') return [];
   const s = v.trim();
@@ -146,22 +138,44 @@ function splitMaybeList(v){
   return parts.map(s => s.trim()).filter(Boolean);
 }
 function cleanCaption(c){ return String(c || '').replace(/\bphoto\b\s*:?/i, '').trim(); }
-function addThumb(container, src, caption){
+function addThumb(container, srcVal, caption){
   if (!container) return;
-  const items = splitMaybeList(src).map(s=>String(s).trim()).filter(Boolean);
+  const items = splitMaybeList(srcVal).map(s=>String(s).trim()).filter(Boolean);
+  const nice = cleanCaption(caption);
   items.forEach(rawUrl => {
     const wrap = document.createElement('div'); wrap.className='thumb';
-    const img = new Image(); img.loading='lazy'; img.referrerPolicy='no-referrer';
-    const nice = cleanCaption(caption); img.alt = nice || 'Image';
-    const chain = [rawUrl];
-    const id = driveIdsFromUrl(rawUrl); if (id) driveCandidates(id).forEach(u => { if (!chain.includes(u)) chain.push(u); });
-    let idx = 0; function tryNext(){ if (idx >= chain.length){ wrap.classList.add('broken'); img.remove(); return; } img.src = chain[idx++]; }
-    img.onerror = tryNext; tryNext();
+    const img = new Image(); img.loading='lazy'; img.decoding='async'; img.alt = nice || 'Image';
+
+    const chain = [];
+    const id = (function(url){
+      try {
+        const u = new URL(url);
+        if (!u.hostname.includes('drive.google.com')) return null;
+        const m = url.match(/\/file\/d\/([^/]+)\//);
+        if (m && m[1]) return m[1];
+        const id = u.searchParams.get('id');
+        return id || null;
+      } catch { return null; }
+    })(rawUrl);
+    if (id) {
+      driveCandidates(id).forEach(u => { if (!chain.includes(u)) chain.push(u); });
+    } else if (/^https?:\/\//i.test(rawUrl) && !/drive\.google\.com/i.test(rawUrl)) {
+      chain.push(rawUrl);
+    } else {
+      return;
+    }
+
+    let i = 0;
+    function next(){ if (i >= chain.length){ wrap.classList.add('broken'); return; } img.src = chain[i++]; }
+    img.onerror = next; next();
+
     wrap.append(img); container.append(wrap);
-    wrap.addEventListener('click', () => { if (img && img.complete && img.naturalWidth > 0) openModal(img.src, nice); else window.open(chain[0], '_blank', 'noopener'); });
+    wrap.addEventListener('click', () => {
+      if (img && img.complete && img.naturalWidth > 0) openModal(img.src, nice);
+      else if (chain[0]) window.open(chain[0], '_blank', 'noopener');
+    });
   });
 }
-
 // ---- Modal viewer ----
 const modal = document.getElementById('img-modal');
 const modalImg = document.getElementById('modal-img');
@@ -204,6 +218,24 @@ function highlightParcelSmart(parcelId){
 let ALL_ROWS = []; let CURRENT_INDEX = -1;
 let IDX = []; let FILTERED = []; let PAGE = 1;
 const PAGE_SIZE = 5;
+
+// --- live search: filter indexed rows and re-render results table
+document.addEventListener('preplan:search', function(ev){
+  try {
+    var q = String((ev && ev.detail && ev.detail.q) || '').toLowerCase().trim();
+    if (typeof IDX === 'undefined' || !Array.isArray(IDX)) return;
+    if (!q) {
+      FILTERED = IDX.slice();
+    } else {
+      FILTERED = IDX.filter(function(it){
+        return (it.hay && it.hay.indexOf(q) > -1)
+            || (it.label && it.label.toLowerCase().indexOf(q) > -1);
+      });
+    }
+    PAGE = 1;
+    if (typeof renderResults === 'function') renderResults();
+  } catch(e){ console.warn('search handler failed', e); }
+});
 
 function normalizeAddress(s){ return String(s||'').toLowerCase().trim(); }
 function makeIndex(rows){
@@ -341,10 +373,25 @@ function loadRow(i){
 // ---- Data load (JSONP) ----
 async function loadAllRows() {
   if (!SHEET_URL) throw new Error('SHEET_URL missing');
-  const { data } = await loadJSONP(SHEET_URL);
-  if (!data || !Array.isArray(data) || !data.length) throw new Error('No data in sheet response');
-  return data;
+  const payload = await loadJSONP(SHEET_URL);
+
+  // Case A: your old feed: { data: [...] }
+  if (payload && Array.isArray(payload.data)) return payload.data;
+
+  // Case B: GViz: { table: { cols:[{label}], rows:[{c:[{v}]}] } }
+  if (payload && payload.table && Array.isArray(payload.table.cols) && Array.isArray(payload.table.rows)) {
+    const headers = payload.table.cols.map(c => (c && (c.label || c.id)) || '');
+    const rows = payload.table.rows.map(r => {
+      const obj = {};
+      headers.forEach((h, i) => { obj[h || `Col${i+1}`] = (r.c && r.c[i] && r.c[i].v) != null ? r.c[i].v : ''; });
+      return obj;
+    });
+    return rows;
+  }
+
+  throw new Error('No data in sheet response');
 }
+
 
 // ---- Init ----
 (async function initAll(){
@@ -371,58 +418,65 @@ async function loadAllRows() {
   }
 })();
 
-// ---- Edit Modal ----
-function openEditModal(row){
-  const dlg=document.getElementById('edit-modal'); if(!dlg) return;
-  document.getElementById('edit-id').value = row?.id || row?.['id'] || '';
-  document.getElementById('edit-business').value = (row && (row['Business Name'] || row.Name)) || '';
-  document.getElementById('edit-address').value = (row && (row['Site Address'] || row.Address)) || '';
-  document.getElementById('edit-phone').value = row?.Phone || '';
-  document.getElementById('edit-notes').value = row?.Notes || '';
-  dlg.showModal();
-}
-window.openEditModal = openEditModal;
-
-(function setupEditModal(){
-  const dlg = document.getElementById('edit-modal');
-  if(!dlg) return;
-  const closeBtn = document.getElementById('edit-close');
-  const cancelBtn = document.getElementById('edit-cancel');
-  [closeBtn, cancelBtn].forEach(b=> b && b.addEventListener('click', ()=> dlg.close()));
-
-  const form = document.getElementById('edit-form');
-  form?.addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    if (!WEBAPP_URL || !EDIT_SECRET) { alert('Edit endpoint not configured'); return; }
-    const fd = new FormData(form); const data = {}; fd.forEach((v,k)=> data[k]=v);
-    const isUpdate = !!(data.id && String(data.id).trim());
-    const payload = { secret: EDIT_SECRET, action: isUpdate ? 'update' : 'append', data };
-
-    try {
-      // Opaque POST (no-cors + simple content type). We cannot read response; assume success.
-      await fetch(WEBAPP_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
-      });
-
-      // Refresh data via JSONP to reflect changes
-      const fresh = await loadAllRows();
-      ALL_ROWS = fresh; makeIndex(ALL_ROWS); renderResults();
-      try{ localStorage.setItem('preplan_cache_v1', JSON.stringify({rows: ALL_ROWS, ts: Date.now()})); }catch{}
-      dlg.close();
-    } catch(err){
-      alert('Save failed: ' + String(err.message || err));
-    }
-  });
-})();
-
-// ---- Delegated handler for Edit buttons inside results table ----
+// Legacy modal disabled
 document.addEventListener('click', (e)=>{
-  const btn = e.target.closest('.btn-edit'); if(!btn) return;
+  const btn = e.target.closest('.btn-edit');
+  if (!btn) return;
+  e.preventDefault();
   e.stopPropagation();
-  const i = parseInt(btn.getAttribute('data-i'),10);
-  const row = (ALL_ROWS && Number.isInteger(i)) ? ALL_ROWS[i] : null;
-  window.openEditModal && window.openEditModal(row || {});
+  // no-op here — real handler below opens the GAS editor tab
 });
+
+
+// --- bind search form ---
+document.addEventListener('DOMContentLoaded', function(){
+  var form  = document.getElementById('search-form');
+  var input = document.getElementById('search-input');
+  if (!form || !input) return;
+  function runQuery(q){
+    q = String(q||'').trim();
+    try {
+      if (window.jQuery && window.jQuery.fn && window.jQuery.fn.dataTable) {
+        var dt = jQuery('#example').DataTable();
+        if (dt) { dt.search(q).draw(); return; }
+      }
+    } catch(e){}
+    var tb = document.querySelector('#example tbody');
+    if (tb){
+      var rows = tb.querySelectorAll('tr');
+      rows.forEach(function(tr){
+        var text = tr.textContent || '';
+        tr.style.display = q ? (text.toLowerCase().indexOf(q.toLowerCase())>-1 ? '' : 'none') : '';
+      });
+    }
+    try { document.dispatchEvent(new CustomEvent('preplan:search', { detail:{ q:q } })); } catch(e){}
+  }
+  var tid;
+  input.addEventListener('input', function(){ clearTimeout(tid); tid = setTimeout(function(){ runQuery(input.value); }, 200); });
+  form.addEventListener('submit', function(e){ e.preventDefault(); runQuery(input.value); });
+});
+
+
+
+// === Open Editor in GAS Tab ===
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwysXsTCRNZSgj1EkaOqQJYKhQt62KeoQyVriKPszDvv80gpnfeOViYZrKbxrtO17rQVw/exec'; 
+  document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn-edit');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  let key = btn.getAttribute('data-key');
+  const tr = btn.closest('tr');
+  if (!key && tr) key = tr.getAttribute('data-key') || tr.getAttribute('data-row') || tr.getAttribute('data-row-number');
+  if (!key && tr) {
+    const iAttr = tr.getAttribute('data-i');
+    if (iAttr && /^\d+$/.test(iAttr)) key = String(parseInt(iAttr, 10) + 2); // fallback = sheet row#
+  }
+  if (!key) { alert('Missing key for editor'); return; }
+
+  const href = GAS_URL.replace(/\/$/, '') + `?ui=edit&key=${encodeURIComponent(key)}`;
+  window.open(href, '_blank', 'noopener');
+});
+
+// === End Open Editor ===
