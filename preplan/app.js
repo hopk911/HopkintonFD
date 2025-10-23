@@ -77,12 +77,13 @@ function whichCategory(key){
 
 // --- helpers to guarantee General Information + contact-body exist ---
 function ensureGeneralInfo(){
-  var gi = document.getElementById('general-info');
+  var gi = document.getElementById('contact');
   if (!gi){
     gi = document.createElement('section');
-    gi.id = 'general-info';
-    gi.className = 'tile';
-    gi.innerHTML = '<div class="tile-head"><h2 class="tile-title">General Information</h2></div><div class="tile-body" id="contact-body"></div>';
+    gi.id = 'contact';
+    gi.className = 'tile contact';
+    gi.innerHTML = '<div class="tile-head"><h2 class="tile-title">General Information</h2></div>'+
+                   '<div class="tile-body" id="contact-body"></div>';
     var panel = document.getElementById('results-panel');
     if (panel && panel.parentNode){ panel.parentNode.insertBefore(gi, panel.nextSibling); }
     else { document.body.appendChild(gi); }
