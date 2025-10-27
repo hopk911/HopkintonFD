@@ -1,473 +1,73 @@
-/* ========== Base layout ========== */
-* { box-sizing: border-box; }
-html, body { 
-  margin: 0; 
-  padding: 0; 
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; 
-  color: #111; 
-  background: #fff; 
+
+:root{--bg:#f7f8fb;--card:#fff;--text:#111;--muted:#6b7280;--line:#e5e7eb;--primary:#2563eb;
+--c-fire:#ef4444;--c-ems:#10b981;--c-water:#3b82f6;--c-electric:#f59e0b;--c-gas:#fb923c;--c-hazmat:#8b5cf6;--c-elevators:#14b8a6;--c-other:#374151}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+.app-header{padding:12px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line)}
+.brand{font-weight:700}
+.toolbar{display:flex;gap:12px;align-items:center;padding:12px 20px}
+.search{flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+.btn{padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer}
+.btn.secondary{background:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:0 20px 28px;padding:12px}
+table{width:100%;border-collapse:collapse}
+thead th,tbody td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+#dataTable tbody tr{cursor:pointer}
+.td-photo{width:110px}
+.tbl-thumb{width:76px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block;background:#f2f2f2}
+.pager{display:flex;gap:12px;align-items:center;justify-content:center;padding:12px}
+
+/* modal + fallback */
+.modal{width:min(900px,92vw);border:none;border-radius:16px;padding:0;background:#fff}
+.modal[open]{display:block}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+@supports not (anchor-name: --dummy) {
+  .modal[open]{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1001;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1000}
 }
-img { max-width: 100%; height: auto; display: block; }
-
-.container { width: min(1100px, 92%); margin: 0 auto; }
-
-/* ========== Header / Nav (stacked, no submenus) ========== */
-.site-header {
-  background: #000;
-  color: #fff;
-  position: relative;
-  z-index: 1000;
-}
-
-.nav {
-  align-items: center;
-  display: flex;
-  flex-direction: column;   /* stack brand and links */
-  
-  gap: 8px;
-  padding: 8px 0;
-}
-
-.nav__brand {
-  display: block;
-  font-weight: 800;
-  font-size: 1.7rem;
-  color: #fff;
-  text-decoration: none;
-  margin: 0;
-  padding-bottom: 6px;
-  border-bottom: 2px solid #fff; /* underline */
-
-  text-align: center;
-}
-
-.nav__links {
-  justify-content: center;
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  
-  align-items: center;
-}
-
-/* Neutralize legacy dropdown remnants (scoped) */
-.site-header .dropdown,
-.site-header .dropdown-content,
-.site-header .dropdown-submenu,
-.site-header .submenu,
-.site-header .submenu-btn { all: unset; }
-
-.site-header .submenu,
-.site-header .dropdown-content { display: none !important; }
-
-
-.nav__links > li > a {
-  color: #fff;
-  font-weight: 700;
-  text-decoration: none;
-  padding: .4rem .6rem;
-  display: inline-block;
-  border-radius: 8px;
-  transition: background .15s ease;
-}
-
-.nav__links > li > a.active { text-decoration: underline; }
-
-.nav__links > li > a:hover {
-  background: rgba(255,255,255,0.12);
-}
-
-/* Neutralize legacy dropdown remnants */
-
-
-  .nav__links { justify-content: center; }
-
-
-/* ========== Hero/* ========== Hero ========== */
-.hero__image { 
-  width: 100%; 
-  height: clamp(120px, 24vw, 240px); /* smaller overall than original */
-  object-fit: cover; 
-}
-
-/* ========== Section Divider ========== */
-.section-divider { 
-  border: none; 
-  border-top: 2px solid #000; 
-  margin: 12px auto 24px; 
-  width: 100%; 
-}
-
-/* ========== Compartment navigation ========== */
-.compartment-nav { margin: 16px 0 6px; }
-.comp-links { 
-  display: flex; flex-wrap: wrap; gap: .5rem 1rem; list-style: none; 
-  padding: 0; margin: 0; align-items: center; justify-content: center; 
-}
-.comp-link, .comp-btn { 
-  background: transparent; border: none; color: #000; 
-  font-weight: 700; cursor: pointer; text-decoration: none; 
-  padding: .4rem .6rem; 
-}
-.comp-link.active, .comp-menu a.current { text-decoration: underline; }
-
-/* Dropdown groups */
-.comp-dropdown { position: relative; }
-.comp-menu {
-  position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-  min-width: 240px; background: #f1f1f1; border: 1px solid #ddd; border-radius: 8px;
-  display: none; list-style: none; margin: .25rem 0 0; padding: .35rem;
-}
-.comp-dropdown.open .comp-menu { display: block; }
-.comp-menu a { 
-  display: block; padding: .5rem .6rem; color: #000; 
-  text-decoration: none; border-radius: 6px; font-weight: 700; text-align: center; 
-}
-.comp-menu a:hover { background: #e7e7e7; }
-
-/* ========== Compartment sections ========== */
-.comp-section { margin: 10px 0 40px; }
-
-.comp-layout {
-  display: grid;
-  grid-template-columns: 320px 1fr;   /* photo col fixed, table gets the space */
-  grid-auto-rows: auto;
-  gap: 20px;
-  align-items: start;
-}
-
-/* Let the title and table participate directly in the parent grid */
-.comp-content { display: contents; }
-
-/* Placement-only rule so the title sits above the table */
-.comp-content > .section-title {
-  grid-column: 2;        
-  justify-self: center;  
-}
-
-/* Table: row 2, column 2 */
-.comp-content > .info-table { grid-column: 2; }
-
-/* Photo: row 2, column 1 â€” aligns with top of the table */
-.comp-photo {
-  margin-top: 0;
-  grid-column: 1;
-  grid-row: auto;
-  align-self: start;
-  margin: 6px 0 0;       /* small top margin for balance */
-  text-align: center;
-}
-.comp-photo img {
-  width: 100%;
-  height: auto;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0,0,0,.1);
-}
-.comp-photo figcaption {
-  font-size: .9rem;
-  color: #444;
-  margin-top: .4rem;
-}
-
-/* Mobile: stack everything naturally */
-@media (max-width: 900px) {
-  .comp-content { display: block; }
-  .comp-content > .section-title,
-  .comp-content > .info-table,
-  .comp-photo { grid-column: 1 / -1; grid-row: auto; }
-}
-
-/* ========== Tables ========== */
-.info-table { width: 100%; border-collapse: collapse; }
-.info-table td, .info-table th { padding: 8px 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
-.info-table tr:nth-child(even) td { background: #fafafa; }
-.img-cell { width: 140px; text-align: right; }
-.img-cell img { width: 120px; height: 80px; object-fit: contain; cursor: zoom-in; border-radius: 6px; }
-
-
-
-
-/* ========== Footer ========== */
-.site-footer { background: #000; color: #fff; margin-top: 30px; }
-.site-footer p { margin: 0; padding: 16px 0; text-align: center; }
-
-
-/* ========== Titles ========== */
-.section-title {
-  text-align: center;
-  margin: 12px 0 12px;
-  font-size: 1.6rem;
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 6px;
-  padding-bottom: 6px;
-}
-
-/* Subheadings placed as table captions */
-.info-table caption.subheading {
-  caption-side: top;
-  text-align: left;
-  font-size: 1.2rem;
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 6px;
-  padding-bottom: 6px;
-}
-
-/* Allow inline compartment photos to align with their corresponding tables */
-.comp-content > .comp-photo { grid-column: 1; align-self: start; }
-
-/* Override for inline photos so they don't force row 2 */
-.comp-content > .comp-photo { grid-row: auto; }
-
-/* Legacy single figure stays aligned under the title */
-.comp-layout > .comp-photo { grid-column: 1; grid-row: 2; align-self: start; }
-
-
-
-/* Normalize Driver's/Officer's dropdown button text to match other items (Top, Cab, etc.) */
-.comp-btn { font-size: 1rem; }
-
-/* Mobile: let header dropdowns wrap instead of stretching horizontally */
-  .dropdown { position: static; }
-  .dropdown-content {
-    position: static;              /* stack under the button */
-    display: grid;                 /* wrap items neatly */
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 8px;
-    width: 100%;
-    max-width: 100%;
-    box-shadow: none;              /* avoid giant overlay shadow on mobile */
-    background: transparent;       /* blend into header on mobile */
-    padding: 8px 0;
-  }
-  .dropdown-content > li,
-  .dropdown-content > a {
-    margin: 0;
-    white-space: normal;           /* allow text to wrap */
-  }
-  .dropbtn,
-  .submenu-btn {
-    display: block;
-    width: 100%;
-    font-size: 1rem;               /* match other items */
-    line-height: 1.25;
-    padding: 8px 10px;
-    white-space: normal;
-  }
-  /* Submenu lists also wrap/stack cleanly */
-  .dropdown-submenu { position: static; width: 100%; }
-  .dropdown-submenu .submenu {
-    position: static;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 6px;
-    padding-left: 8px;
-    background: transparent;
-    box-shadow: none;
-  }
-
-
-
-
-/* ===== D2 second image alignment (top aligned with "Rear" title) ===== */
-#D2 .comp-photo img:nth-of-type(2) {
-  grid-column: 1;
-  grid-row: 6;        /* ensures it aligns with the first row, same as Rear title */
-  align-self: start;  /* align photo top to the row top */
-  margin-top: 0;      /* remove extra spacing */
-}
-
-/* === D2 Front alignment: match photo and caption top === */
-#D2 .comp-photo { margin-top: 0; }
-#D2 .info-table caption { margin-top: 0; }
-
-/* === O5 alignment fixes === */
-#O5 .comp-photo {
-  margin-top: 0;   /* remove gap above Chimney Bucket */
-}
-#O5 .section-title {
-  margin-bottom: 0.25rem; /* tighten spacing under the title */
-}
-
-/* === O5: tighten vertical spacing above "Chimney Bucket" === */
-#O5 .comp-layout { row-gap: 8px; }             /* reduce default gap (was 20px) */
-#O5 .info-table { margin-top: 0; }             /* ensure tables donâ€™t add extra top margin */
-#O5 .comp-photo { margin-top: 0; }             /* already zeroed, keep explicit */
-
-/* === O5 section title spacing fix === */
-#O5 .section-title {
-  margin-top: 0;
-  padding-top: 0;
-}
-
-.town-card {
-  display: flex;
-  flex-direction: column;
-  background: #f7f7f7;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  cursor: pointer;
-  transition: transform .15s ease, box-shadow .15s ease;
-}
-.town-card:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.10); }
-
-.town-card__media {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  background: #e9eef3;
-  overflow: hidden;
-}
-.town-card__media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.town-card__label {
-  padding: 14px 16px;
-  font-weight: 700;
-  color: #222;
-  text-align: center;
-}
-
-/* Modal */
-
-
-
-
-/* ==== Run Cards helpers ==== */
-.rc-images {
-  max-width: 900px;
-  margin: 20px auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.rc-images img {
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-.rc-link {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: 40px auto 20px;
-  text-align: center;
-}
-.rc-link a {
-  font-weight: 700;
-  text-decoration: none;
-  color: #0f172a;
-}
-.rc-link a:hover { text-decoration: underline; }
-
-/* ==== Run Cards mobile optimizations (shrink images, center link) ==== */
-  .rc-link a {
-    font-size: 1rem;
-    text-align: center;
-  }
-  .rc-images {
-    width: auto;
-    max-width: 100%;
-    margin: 0 auto;
-    padding: 0;
-  }
-  .rc-images img {
-    display: block;
-    max-width: 100%;
-    height: auto;
-  }
-
-
-
-.map-card {
-  display: block;
-  background: #f7f7f7;
-  border-radius: 12px;
-  overflow: hidden;
-  text-decoration: none;
-  border: 2px solid #ccc;
-  box-shadow: 0 2px 10px rgba(0,0,0,.12);
-  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
-  color: inherit;
-}
-
-.map-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0,0,0,.16);
-  border-color: #bbb;
-}
-
-.map-card img {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-  display: block;
-}
-
-.map-card h3 {
-  margin: 0;
-  padding: 12px 14px;
-  text-align: center;
-  font-size: 1.05rem;
-  font-weight: 800;
-  color: #111;
-  background: #fff;
-}
-
-
-.page-title {
-  text-align: center;
-  margin: 20px 0;
-}
-
-/* Focus visibility for accessibility */
-a:focus-visible,
-button:focus-visible,
-[role="button"]:focus-visible {
-  outline: 2px solid #000;
-  outline-offset: 2px;
-}
-
-
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
-}
-
-
-
-/* ===== Footer lock (final wins) ===== */
-footer, .site-footer {
-  background: #000 !important;
-  color: #fff !important;
-}
-footer a, .site-footer a {
-  color: #fff !important;
-  text-decoration: none;
-}
-
-
-/* Make all grid/tile/card images scale and crop nicely */
-.grid img, [class*="grid"] img, .tile img, .card img {
-  width: 100%;
-  height: auto;            /* fallback if aspect-ratio not supported */
-  aspect-ratio: 4 / 3;     /* consistent thumb shape */
-  object-fit: cover;       /* crop instead of stretching */
-  display: block;
-}
-
-/* 2-up grid on small screens so tiles aren't gigantic */
-@media (max-width: 600px) {
-  .grid { 
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
+.modal-head{display:flex;align-items:center;gap:12px;justify-content:space-between;border-bottom:1px solid var(--line);padding:12px 16px}
+.modal-content{padding:16px;max-height:70vh;overflow:auto}
+.modal-backdrop[hidden]{display:none}
+
+/* Thumb left of title in modal header */
+.modal-thumb{width:56px;height:56px;flex:0 0 56px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:#f2f2f2}
+.modal-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+
+.section{margin:20px 0}
+.section .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.kv .k{font-weight:600;color:var(--muted);font-size:13px}
+.kv .v{margin-top:2px}
+
+.thumb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.thumb-grid img{width:100%;height:130px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:#f2f2f2}
+
+/* section nav chips */
+.section-nav{display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px 0}
+.section-nav .chip{border:none;border-radius:999px;padding:6px 10px;font-size:13px;color:#fff;cursor:pointer}
+.section-nav .chip[data-color="fire"]{background:var(--c-fire)}
+.section-nav .chip[data-color="ems"]{background:var(--c-ems)}
+.section-nav .chip[data-color="water"]{background:var(--c-water)}
+.section-nav .chip[data-color="electric"]{background:var(--c-electric)}
+.section-nav .chip[data-color="gas"]{background:var(--c-gas)}
+.section-nav .chip[data-color="hazmat"]{background:var(--c-hazmat)}
+.section-nav .chip[data-color="elevators"]{background:var(--c-elevators)}
+
+/* section title bars - full color */
+.section[data-color] h3{margin:0 0 8px;padding:10px 12px;border:0;color:#fff;border-radius:8px}
+.section[data-color="fire"] h3{background:var(--c-fire)}
+.section[data-color="ems"] h3{background:var(--c-ems)}
+.section[data-color="water"] h3{background:var(--c-water)}
+.section[data-color="electric"] h3{background:var(--c-electric)}
+.section[data-color="gas"] h3{background:var(--c-gas)}
+.section[data-color="hazmat"] h3{background:var(--c-hazmat)}
+.section[data-color="elevators"] h3{background:var(--c-elevators)}
+.section[data-color="other"] h3{background:var(--c-other)}
+
+
+/* Hide only the photo inside the 'Other' row in the record modal */
+#recordModal #modalContent .is-other-row img { display: none !important; }
+
+/* Hide photos only in 'Other' section (modal) */
+#recordModal #modalContent .section[data-color="other"] .thumb-grid img { 
+  display: none !important; 
 }

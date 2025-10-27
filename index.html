@@ -1,96 +1,101 @@
 <!doctype html>
 <html lang="en">
-	<head>
-		
-		<meta http-equiv="Content-Security-Policy"
-      content="default-src 'self';
-               img-src 'self' data: https://drive.google.com https://lh3.googleusercontent.com;
-               script-src 'self' https://script.google.com https://www.google.com;
-               connect-src 'self';
-               style-src 'self' 'unsafe-inline';">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HFD Pre-Plan</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:," />
+  <script>
+    window.WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwysXsTCRNZSgj1EkaOqQJYKhQt62KeoQYVriKPszDvv80gpnfeOViYZrKbxrtO17rQVw/exec";
+    window.GOOGLE_SHEET_JSON_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnI5i_UglY6cveM2wxO9R9lOCgNKB44V4wsROjujIg4SVw9oHCrLShe8WsrTUErebWIwp7mwtaNHq9/pub?output=csv";
+    window.EDIT_SECRET = window.EDIT_SECRET || "changeme";
+    window.__BUILD__ = "v3-fix19-proxy-thumbs";
+  </script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">HFD Pre-Plan</div>
+    <div class="actions">
+      <button id="btnAdd" class="btn">Add New</button>
+      <button id="btnEdit" class="btn" disabled>Edit Selected</button>
+    </div>
+  </header>
 
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>Home — Hopkinton Fire Department</title>
-		
-		
+  <div class="toolbar">
+    <input id="searchInput" class="search" placeholder="Search by name, address, keywords…" />
+  </div>
 
-		<!-- Styles -->
-		<link rel="stylesheet" href="styles.css" type="text/css" />
-		<link rel="stylesheet" href="grid.css" type="text/css" />
-		<link rel="stylesheet" href="mobile.css" type="text/css" />
-	</head>
-	<body>
-		<!-- Header gets injected into this placeholder -->
-		<div id="header-placeholder" data-src="/HopkintonFD/partials/header.html"></div>
+  <section class="card">
+    <h2>Pre-Plan Records</h2>
+    <table id="dataTable">
+      <thead id="tableHead"></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div class="pager">
+      <button id="prevPage" class="btn secondary">Prev</button>
+      <span id="pageInfo" class="pageinfo"></span>
+      <button id="nextPage" class="btn secondary">Next</button>
+    </div>
+  </section>
 
-		<main class="container" id="main-content">
-			<h1 class="section-title">Welcome</h1>
+  <dialog id="recordModal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div id="modalThumbWrap" class="modal-thumb"></div>
+      <h3 id="modalTitle">Record</h3>
+      <button id="btnCloseModal" class="btn secondary">Close</button>
+    </div>
+    <div id="sectionNav" class="section-nav"></div>
+    <div id="modalContent" class="modal-content"></div>
+  </dialog>
+  <div id="modalBackdrop" class="modal-backdrop" hidden></div>
 
-			<div class="town-grid" role="list">
-				<a class="town-card" href="apparatus.html" role="listitem" aria-label="Go to Apparatus">
-					<div class="town-card__media">
-						<img src="images/apparatus.jpg" alt="Fire apparatus lineup" />
-					</div>
-					<div class="town-card__label">Apparatus</div>
-				</a>
+  <script src="app.driveonly.v2.js?v=v3-fix19-proxy-thumbs"></script>
+<script src="app.js"></script>
+<script src="app.driveonly.v2.js"></script>
 
-				<a class="town-card" href="maps.html" role="listitem" aria-label="Go to Maps">
-					<div class="town-card__media">
-						<img src="images/maps.jpg" alt="Operational maps overview" />
-					</div>
-					<div class="town-card__label">Maps</div>
-				</a>
+  <!-- other-row-tagger -->
+  <script>
+    (function(){
+      var modal = document.getElementById('recordModal');
+      var body  = document.getElementById('modalContent');
+      if (!modal || !body) return;
+      var ROW_SEL   = '.detail-row, .row, .field';
+      var LABEL_SEL = '.field-label, .label, .key';
+      function tagOtherRow(){
+        var rows = body.querySelectorAll(ROW_SEL);
+        rows.forEach(function(row){
+          var label = row.querySelector(LABEL_SEL);
+          if (!label) return;
+          var txt = (label.textContent || '').trim().toLowerCase();
+          if (txt.indexOf('other') === 0) { row.classList.add('is-other-row'); }
+          else { row.classList.remove('is-other-row'); }
+        });
+      }
+      new MutationObserver(tagOtherRow).observe(body, { childList: true, subtree: true });
+      tagOtherRow();
+    })();
+  </script>
+  <!-- hide-photo-label-in-other -->
+  <script>
+    (function(){
+      var body = document.getElementById('modalContent');
+      if (!body) return;
+      function hidePhotoLabelInOther(){
+        // Only within the "Other" section (data-color="other"), hide the label node that reads "Photo:"
+        var labels = body.querySelectorAll('.section[data-color="other"] .kv .k');
+        labels.forEach(function(k){
+          var t = (k.textContent || '').trim().toLowerCase();
+          if (t === 'photo' || t === 'photo:') {
+            k.style.display = 'none';
+          }
+        });
+      }
+      new MutationObserver(hidePhotoLabelInOther).observe(body, { childList: true, subtree: true });
+      hidePhotoLabelInOther();
+    })();
+  </script>
 
-				<a class="town-card" href="run-cards.html" role="listitem" aria-label="Go to Run Cards">
-					<div class="town-card__media">
-						<img src="images/run-cards.jpg" alt="Run cards grid preview" />
-					</div>
-					<div class="town-card__label">Run Cards</div>
-				</a>
 
-				<a class="town-card" href="preplan/index.html" role="listitem" aria-label="Go to Pre-Fire Plans">
-					<div class="town-card__media">
-						<img src="images/preplans.jpg" alt="Pre-Fire Plans grid preview" />
-					</div>
-					<div class="town-card__label">Pre-Fire Plans</div>
-				</a>
-
-				<a class="town-card" href="erg.html" role="listitem" aria-label="Go to ERG">
-					<div class="town-card__media">
-						<img src="images/erg.jpg" alt="Emergency Response Guidebook" />
-					</div>
-					<div class="town-card__label">ERG</div>
-				</a>
-
-				<a class="town-card" href="administrative.html" role="listitem" aria-label="Go to Administrative">
-					<div class="town-card__media">
-						<img src="images/administrative.jpg" alt="Administrative resources" />
-					</div>
-					<div class="town-card__label">Administrative</div>
-				</a>
-
-				<a class="town-card" href="crr.html" role="listitem" aria-label="Go to Community Risk Reduction">
-					<div class="town-card__media">
-						<img src="images/crr.jpg" alt="Community Risk Reduction resources" />
-					</div>
-					<div class="town-card__label">CRR</div>
-				</a>
-
-				<a class="town-card" href="contract.html" role="listitem" aria-label="Go to Contract">
-					<div class="town-card__media">
-						<!-- Ensure this path exists: images/contract/contract.jpg -->
-						<img src="images/contract/contract.jpg" alt="Collective bargaining contract" />
-					</div>
-					<div class="town-card__label">Contract</div>
-				</a>
-			</div>
-		</main>
-
-		<footer class="site-footer">
-			<p><strong>© Hopkinton Fire Department</strong></p>
-		</footer>
-
-		<script src="js/include-header.js"></script>
-	</body>
+</body>
 </html>
