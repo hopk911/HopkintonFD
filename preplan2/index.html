@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HFD Pre-Plan</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:," />
+  <script>
+    window.WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwysXsTCRNZSgj1EkaOqQJYKhQt62KeoQYVriKPszDvv80gpnfeOViYZrKbxrtO17rQVw/exec";
+    window.GOOGLE_SHEET_JSON_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnI5i_UglY6cveM2wxO9R9lOCgNKB44V4wsROjujIg4SVw9oHCrLShe8WsrTUErebWIwp7mwtaNHq9/pub?output=csv";
+    window.EDIT_SECRET = window.EDIT_SECRET || "changeme";
+    window.__BUILD__ = "v3-fix19-proxy-thumbs";
+  </script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">HFD Pre-Plan</div>
+    <div class="actions">
+      <button id="btnAdd" class="btn">Add New</button>
+      <button id="btnEdit" class="btn" disabled>Edit Selected</button>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <input id="searchInput" class="search" placeholder="Search by name, address, keywords…" />
+  </div>
+
+  <section class="card">
+    <h2>Pre-Plan Records</h2>
+    <table id="dataTable">
+      <thead id="tableHead"></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div class="pager">
+      <button id="prevPage" class="btn secondary">Prev</button>
+      <span id="pageInfo" class="pageinfo"></span>
+      <button id="nextPage" class="btn secondary">Next</button>
+    </div>
+  </section>
+
+  <dialog id="recordModal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div id="modalThumbWrap" class="modal-thumb"></div>
+      <h3 id="modalTitle">Record</h3>
+      <button id="btnCloseModal" class="btn secondary">Close</button>
+    </div>
+    <div id="sectionNav" class="section-nav"></div>
+    <div id="modalContent" class="modal-content"></div>
+  </dialog>
+  <div id="modalBackdrop" class="modal-backdrop" hidden></div>
+
+  <script src="app.driveonly.v2.js?v=v3-fix19-proxy-thumbs"></script>
+<script src="app.js"></script>
+<script src="app.driveonly.v2.js"></script>
+
+  <!-- other-row-tagger -->
+  <script>
+    (function(){
+      var modal = document.getElementById('recordModal');
+      var body  = document.getElementById('modalContent');
+      if (!modal || !body) return;
+      var ROW_SEL   = '.detail-row, .row, .field';
+      var LABEL_SEL = '.field-label, .label, .key';
+      function tagOtherRow(){
+        var rows = body.querySelectorAll(ROW_SEL);
+        rows.forEach(function(row){
+          var label = row.querySelector(LABEL_SEL);
+          if (!label) return;
+          var txt = (label.textContent || '').trim().toLowerCase();
+          if (txt.indexOf('other') === 0) { row.classList.add('is-other-row'); }
+          else { row.classList.remove('is-other-row'); }
+        });
+      }
+      new MutationObserver(tagOtherRow).observe(body, { childList: true, subtree: true });
+      tagOtherRow();
+    })();
+  </script>
+
+</body>
+</html>
