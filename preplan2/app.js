@@ -1,5 +1,6 @@
 (function(){
   'use strict';
+  let EDIT_MODE = false;
 
   // ---- Runtime config
   const cfg = {
@@ -248,6 +249,37 @@ function buildImgWithFallback(srcOrId, cls, size) {
   // ---- Render table & modal (single definitions)
   const PAGE_SIZE=10; let page=0,rows=[],headers=[],selectedIndex=-1;
 
+  
+
+
+
+async function saveRecord(recOriginal, formEl){
+  // Collect updated values
+  const updated = { ...recOriginal };
+  formEl.querySelectorAll('input[name],textarea[name]').forEach(el => {
+    updated[el.name] = el.value || '';
+  });
+
+  const keyField = cfg.keyHeader || 'Stable ID';
+  const key = String(recOriginal[keyField] || '');
+  const payload = { fn:'save', keyField, key, row: updated };
+
+  const url = (cfg.webapp || '').replace(/\?+$/,'');
+  const body = new URLSearchParams({ payload: JSON.stringify(payload) });
+  const resp = await fetch(url, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8' },
+    body
+  });
+  const text = await resp.text();
+  let j = null; try { j = JSON.parse(text); } catch(_){}
+  if (!resp.ok || !j || j.ok !== true) throw new Error((j && (j.error||j.message)) || 'Save failed');
+  Object.assign(recOriginal, updated); rows[selectedIndex] = recOriginal;
+  return j;
+}
+
+
+
   function renderTable(){
     tableHead.innerHTML = '<tr>'+TABLE_COLUMNS.map(c=>'<th>'+c.label+'</th>').join('')+'</tr>';
     const start=page*PAGE_SIZE; const slice=rows.slice(start,start+PAGE_SIZE);
@@ -323,7 +355,70 @@ function buildImgWithFallback(srcOrId, cls, size) {
       </section>`;
     }
     modalContent.innerHTML = html;
+
+    // --- Edit Mode: rebuild section grids into inputs ---
+    // reuse existing rec from top of openModal
+    if (EDIT_MODE) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      tmp.querySelectorAll('.section').forEach(sec => {
+        const secId = (sec.id||'').replace(/^section-/,'');
+        const grid = sec.querySelector('.grid');
+        if (!grid) return;
+        const wrap = document.createElement('div'); wrap.className = 'grid';
+        headers.forEach(h => {
+          if (isHiddenInModal(h)) return;
+          if (sectionForField(h) !== secId) return;
+          const v = String(rec[h] ?? '');
+          const input = (v.length > 60 || /\n/.test(v))
+            ? `<textarea name="${h}" rows="3">${v.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>`
+            : `<input name="${h}" type="text" value="${v.replace(/&/g,'&amp;').replace(/</g,'&lt;')}" />`;
+          const kv = document.createElement('div'); kv.className = 'kv';
+          kv.innerHTML = `<div class="k">${h}</div><div class="v">${input}</div>`;
+          wrap.appendChild(kv);
+        });
+        grid.replaceWith(wrap);
+      });
+      html = tmp.innerHTML;
+      modalContent.innerHTML = `<form id="editForm">${html}</form>`;
+    }
+
     loadThumbsWithin(modalContent);
+
+    // In-modal Edit toggle
+    const mmToggle = document.getElementById('btnToggleEdit');
+    if (mmToggle) {
+      mmToggle.textContent = EDIT_MODE ? 'View' : 'Edit';
+      mmToggle.onclick = () => { EDIT_MODE = !EDIT_MODE; openModal(); };
+    }
+
+    // In-modal Save button (only in EDIT mode)
+    const head = document.querySelector('.modal-head');
+    if (head) {
+      let saveBtn = document.getElementById('btnSaveRecord');
+      if (EDIT_MODE && !saveBtn) {
+        saveBtn = document.createElement('button');
+        saveBtn.id = 'btnSaveRecord';
+        saveBtn.className = 'btn';
+        saveBtn.type = 'button';
+        saveBtn.textContent = 'Save';
+        saveBtn.onclick = async () => {
+          try {
+            const form = document.getElementById('editForm');
+            await saveRecord(rec, form);
+            EDIT_MODE = false;
+            openModal();
+            alert('Saved');
+          } catch(e) {
+            alert('Save error: ' + e.message);
+          }
+        };
+        head.insertBefore(saveBtn, document.getElementById('btnCloseModal'));
+      } else if (!EDIT_MODE && saveBtn) {
+        saveBtn.remove();
+      }
+    }
+
     // Open
     if (modal.showModal) modal.showModal(); else { modal.setAttribute('open',''); backdrop.hidden=false; }
   }
