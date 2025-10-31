@@ -1,13 +1,37 @@
+/* HFD Pre-Plan — single-file bundle
+   - Merges: drive-only thumbnail helper + main app logic
+   - No prototype monkey-patching; no duplicate globals
+*/
 (function(){
   'use strict';
 
-  // ---- Runtime config
-  const cfg = {
+  // ---------- Config ----------
+  const CFG = {
     get sheet(){ return window.GOOGLE_SHEET_JSON_URL || ''; },
     get webapp(){ return window.WEBAPP_URL || ''; }
   };
 
-  // ---- Sections (order matters; "other" first for title-as-name)
+  // ---------- Drive-only thumbnail builder ----------
+  function extractDriveId(input){
+    if (!input) return '';
+    const s = String(input).trim();
+    let m = s.match(/[?&]id=([a-zA-Z0-9_-]{10,})/); if (m) return m[1];
+    m = s.match(/\/d\/([a-zA-Z0-9_-]{10,})/);     if (m) return m[1];
+    m = s.match(/^([a-zA-Z0-9_-]{20,})$/);         if (m) return m[1];
+    return '';
+  }
+  function buildImgWithFallback(srcOrId, cls, size){
+    if (!srcOrId) return '';
+    const w = size || 600;
+    const id = extractDriveId(srcOrId);
+    const url = id ? ('https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w' + w)
+                   : String(srcOrId);
+    const klass = cls ? (' ' + cls) : '';
+    return '<img src="' + url + '" class="thumb' + klass + '" loading="lazy" alt="photo">';
+  }
+  function loadThumbsWithin(){ /* no-op in drive-only mode */ }
+
+  // ---------- Sections & routing ----------
   const SECTION_CONFIG = [
     { id:'other',     label:'Other',     color:'other'     },
     { id:'fire',      label:'Fire',      color:'fire'      },
@@ -19,7 +43,6 @@
     { id:'hazmat',    label:'Hazmat',    color:'hazmat'    }
   ];
 
-  // ---- Table columns
   const TABLE_COLUMNS = [
     { key:'__photo__', label:'Photo',            getter:r=>firstPhotoWithSection(r) },
     { key:'business',  label:'Business Name',    getter:r=>getField(r,['Business Name','Business Name:','Business','Name','Company','Facility Name']) },
@@ -28,12 +51,10 @@
     { key:'hydrant',   label:'Closest Hydrant',  getter:r=>getField(r,['Closest Hydrant','Closest Hydrant:','Nearest Hydrant','Hydrant Location']) }
   ];
 
-  // ---- Modal field filters / helpers
   const HIDE_IN_MODAL = ['timestamp','time stamp','stable id','stableid','business name','address','closest hydrant','knox box location'];
   const normalizeKey = k => String(k||'').toLowerCase().replace(/[:\s]+$/,'').replace(/[^a-z0-9]+/g,' ').trim();
   const isHiddenInModal = k => HIDE_IN_MODAL.includes(normalizeKey(k));
 
-  // ---- Field routing to sections
   const FIELD_PATTERNS = [
     [/^Remote Alarm Location:?$/i,'fire'],
     [/^Sprinkler Main Shutoff Location:?$/i,'fire'],
@@ -49,157 +70,13 @@
     [/^Closest Hydrant$/i,'water'],
     [/^Knox Box Location$/i,'fire']
   ];
-  const sectionForField = (h)=>{ h=String(h||'').trim(); for(const [re,id] of FIELD_PATTERNS){ if(re.test(h)) return id; } return 'other'; };
-
-  // ---- Drive ID extraction
-  function extractDriveId(s){
-    s=String(s||'').trim(); if(!s) return '';
-    let m=s.match(/^[A-Za-z0-9_-]{20,}$/); if(m) return m[0];
-    try{
-      const u=new URL(s);
-      const idQ=u.searchParams.get('id'); if(idQ) return idQ;
-      m=u.pathname.match(/\/file\/d\/([A-Za-z0-9_-]{20,})/); if(m) return m[1];
-      m=u.pathname.match(/\/d\/([A-Za-z0-9_-]{20,})/); if(m) return m[1];
-      const idQ2=u.searchParams.get('ucid')||u.searchParams.get('fileId'); if(idQ2) return idQ2;
-      if(/googleusercontent\.com$/.test(u.hostname)){ m=u.pathname.match(/\/d\/([A-Za-z0-9_-]{20,})/); if(m) return m[1]; }
-    }catch(e){}
-    m=s.match(/([A-Za-z0-9_-]{20,})/); if(m) return m[1];
-    return '';
+  function sectionForField(label){
+    let h = String(label||'').trim();
+    for (const [re,id] of FIELD_PATTERNS) if (re.test(h)) return id;
+    return 'other';
   }
 
-  function resolveFirstPhoto(rec){
-    const headers = Object.keys(rec||{}).filter(h => /photo/i.test(String(h)));
-    const candidates = [];
-    const pushParts = (val,h)=>{
-      if(!val) return;
-      String(val).split(/[,\r\n]+|\s{2,}/).forEach(part=>{
-        const p=String(part).trim(); if(p) candidates.push({url:p, header:h||''});
-      });
-    };
-    ['Photo','Primary Photo','Main Photo'].forEach(h=>pushParts(rec[h],h));
-    headers.forEach(h=>pushParts(rec[h],h));
-    for(const c of candidates){ const id=extractDriveId(c.url); if(id) return {url:c.url, header:c.header}; }
-    for(const c of candidates){ return {url:c.url, header:c.header}; }
-    return {url:'', header:''};
-  }
-  function firstPhotoWithSection(rec){ const {url,header}=resolveFirstPhoto(rec); const sec=header?sectionForField(header):'other'; return {url,sectionId:sec}; }
-
-  // ---- Stable loader (hybrid: Drive IDs use Drive endpoints; others via proxy)
-  const DRIVE_THUMB = (id,w)=>`https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w||600}`;
-  const LH3_IMG     = (id,w)=>`https://lh3.googleusercontent.com/d/${encodeURIComponent(id)}=w${w||600}`;
-  const PROXY_IMG   = (url,w)=>`${cfg.webapp}?fn=img&u=${encodeURIComponent(url)}&w=${w||600}`;
-  const IMG_CACHE=new Map(), PENDING=new Map(); let IN_FLIGHT=0; let MAX_CONCURRENCY=1;
-
-
-function buildImgWithFallback(srcOrId, cls, size) {
-  if (!srcOrId) return '';
-  const w = size || 600;
-  const id = extractDriveId(srcOrId);
-
-  // Drive thumbnail only (avoids lh3 429s)
-  const url = id
-    ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w}`
-    : String(srcOrId);
-
-  const classAttr = cls ? ` class="${cls} js-thumb"` : ' class="js-thumb"';
-  return `<img data-src="${url}" alt="photo" loading="lazy"${classAttr}>`;
-}
-
-  // --- Backoff & fetch helpers to tame 429s ---
-  const sleep = (ms)=>new Promise(r=>setTimeout(r, ms));
-  async function tryLoad(img, url){
-    return new Promise((resolve, reject)=>{
-      const onLoad = ()=>{ cleanup(); resolve(url); };
-      const onErr  = ()=>{ cleanup(); reject(new Error('load-fail')); };
-      const cleanup= ()=>{ img.removeEventListener('load', onLoad); img.removeEventListener('error', onErr); };
-      img.addEventListener('load', onLoad, { once:true });
-      img.addEventListener('error', onErr, { once:true });
-      img.src = url;
-    });
-  }
-  async function tryWithRetries(img, url){
-    const delays = [500, 1200, 2500];
-    for (let i=0;i<delays.length;i++){
-      try { await tryLoad(img, url); return true; }
-      catch(e){
-        // If server said 429 (rate limit), wait longer; else just move on
-        await sleep(delays[i] + Math.floor(Math.random()*120));
-      }
-    }
-    return false;
-  }
-
-
-  
-  function preloadOnce(url){ /* kept for compatibility; now unused in new loader */ return Promise.resolve(); }
-
-  function _runQueue(q){ if(!q.length||IN_FLIGHT>=MAX_CONCURRENCY) return;
-    const t=q.shift(); IN_FLIGHT++;
-    t().finally(()=>{ IN_FLIGHT--; _runQueue(q); });
-  }
-  
-  // ---- Global guards for retry helpers (in case block scoping hid originals) ----
-  if (typeof window.sleep !== 'function') {
-    window.sleep = (ms)=>new Promise(r=>setTimeout(r, ms));
-  }
-  if (typeof window.tryLoad !== 'function') {
-    window.tryLoad = function(img, url){
-      return new Promise((resolve, reject)=>{
-        function onLoad(){ cleanup(); resolve(url); }
-        function onErr(){ cleanup(); reject(new Error('load-fail')); }
-        function cleanup(){ img.removeEventListener('load', onLoad); img.removeEventListener('error', onErr); }
-        img.addEventListener('load', onLoad, { once:true });
-        img.addEventListener('error', onErr, { once:true });
-        img.src = url;
-      });
-    };
-  }
-  if (typeof window.tryWithRetries !== 'function') {
-    window.tryWithRetries = async function(img, url){
-      const delays = [500, 1200, 2500];
-      for (let i=0;i<delays.length;i++){
-        try { await window.tryLoad(img, url); return true; }
-        catch(e){ await window.sleep(delays[i] + Math.floor(Math.random()*120)); }
-      }
-      return false;
-    };
-  }
-
-  function loadThumbsWithin(root){
-    const imgs=[...((root||document).querySelectorAll('img.js-thumb'))];
-    let toggle=false; // alternate provider order to spread load
-    const tasks = imgs.map(img => () => (async()=>{
-      const primary  = img.getAttribute('data-src') || '';
-      const fallback = img.getAttribute('data-fallback') || '';
-      const pair = toggle ? [fallback, primary] : [primary, fallback];
-      toggle = !toggle;
-
-      // Try first URL with retries; if fails, try the other
-      if (pair[0]) {
-        const ok = await tryWithRetries(img, pair[0]);
-        if (ok) return;
-      }
-      if (pair[1]) {
-        await tryWithRetries(img, pair[1]).catch(()=>{});
-      }
-    })());
-    const q=tasks.slice();
-    (async()=>{await sleep(150+Math.random()*250); for(let i=0;i<Math.min(MAX_CONCURRENCY,q.length);i++) _runQueue(q);})();
-  }
-
-  // ---- DOM refs
-  // ---- DOM refs (defined ONCE)
-  var $ = window.$ || function(id){ return document.getElementById(id); };
-  const tableHead = $('tableHead'), tableBody = $('tableBody');
-  const prevPage  = $('prevPage'), nextPage  = $('nextPage'), pageInfo = $('pageInfo');
-  const btnAdd    = $('btnAdd'),   btnEdit   = $('btnEdit'),   searchInput = $('searchInput');
-  const modal=$('recordModal'),modalTitle=$('modalTitle'),modalContent=$('modalContent'),sectionNav=$('sectionNav');
-  const btnCloseModal=$('btnCloseModal'),backdrop=$('modalBackdrop');
-
-  // ---- Utils (define ONCE)
-  const debounce=(fn,ms)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
-
-  // CSV parse (kept tiny but robust for quoted fields)
+  // ---------- Data helpers ----------
   function csvToObjects(text){
     const rowsA=[]; let field='',row=[],inQ=false;
     for(let i=0;i<text.length;i++){ const c=text[i],n=text[i+1];
@@ -211,12 +88,10 @@ function buildImgWithFallback(srcOrId, cls, size) {
     for(let r=1;r<rowsA.length;r++){ const o={}; H.forEach((h,i)=>o[h]=rowsA[r][i]==null?'':rowsA[r][i]); out.push(o); }
     return out;
   }
-  const normalizeSheetUrl = u => (u||'').trim().replace(/\/pubhtml(\?.*)?$/i,'/pub?output=csv');
-
+  function normalizeSheetUrl(u){ return (u||'').trim().replace(/\/pubhtml(\?.*)?$/i,'/pub?output=csv'); }
   async function loadData(){
-    const SHEET_URL = cfg.sheet;
-    if(!SHEET_URL){ console.warn('No sheet URL configured; using SAMPLE_DATA'); return SAMPLE_DATA; }
-    const eff = normalizeSheetUrl(SHEET_URL);
+    const eff = normalizeSheetUrl(CFG.sheet);
+    if(!eff) return SAMPLE_DATA;
     try{
       if(/output=csv/i.test(eff)){ const t=await fetch(eff).then(r=>r.text()); return csvToObjects(t); }
       const r=await fetch(eff); if(!r.ok) throw new Error('HTTP '+r.status);
@@ -230,12 +105,6 @@ function buildImgWithFallback(srcOrId, cls, size) {
      "FDC":"Front entrance","Water Shutoff":"Meter room","Electric Panel Location":"Rear hall","Gas Meter Location":"NW corner","Haz-Mat":"Paint locker"}
   ];
 
-  function buildHeaders(data){ const s=new Set(); data.forEach(r=>Object.keys(r).forEach(k=>s.add(k))); headers=[...s]; }
-
-  // ---- Modal helpers
-  function renderKV(k,v){ return `<div class="kv"><div class="k">${k}</div><div class="v">${v||''}</div></div>`; }
-  function renderPhotosBlock(items){ return items.length?`<div class="thumb-grid">`+items.map(it=>buildImgWithFallback(it.url,'',300)).join('')+`</div>`:''; }
-
   function getField(rec,keys){
     for(const k of keys){ if(rec[k] && String(rec[k]).trim()) return String(rec[k]).trim(); }
     const map={}; Object.keys(rec||{}).forEach(h=>map[normalizeKey(h)]=h);
@@ -245,8 +114,35 @@ function buildImgWithFallback(srcOrId, cls, size) {
   }
   const isPhotoHeader = h => /photo/i.test(String(h));
 
-  // ---- Render table & modal (single definitions)
+  function resolveFirstPhoto(rec){
+    const headers = Object.keys(rec||{}).filter(h => /photo/i.test(String(h)));
+    const candidates = [];
+    const pushParts = (val,h)=>{
+      if(!val) return;
+      String(val).split(/[\,\r\n]+|\s{2,}/).forEach(part=>{
+        const p=String(part).trim(); if(p) candidates.push({url:p, header:h||''});
+      });
+    };
+    ['Photo','Primary Photo','Main Photo'].forEach(h=>pushParts(rec[h],h));
+    headers.forEach(h=>pushParts(rec[h],h));
+    for(const c of candidates){ const id=extractDriveId(c.url); if(id) return {url:c.url, header:c.header}; }
+    for(const c of candidates){ return {url:c.url, header:c.header}; }
+    return {url:'', header:''};
+  }
+  function firstPhotoWithSection(rec){ const {url,header}=resolveFirstPhoto(rec); const sec=header?sectionForField(header):'other'; return {url,sectionId:sec}; }
+
+  // ---------- DOM refs ----------
+  const $ = (id)=>document.getElementById(id);
+  const tableHead = $('tableHead'), tableBody = $('tableBody');
+  const prevPage  = $('prevPage'), nextPage = $('nextPage'), pageInfo = $('pageInfo');
+  const btnAdd    = $('btnAdd'), searchInput = $('searchInput');
+  const modal=$('recordModal'),modalTitle=$('modalTitle'),modalContent=$('modalContent'),sectionNav=$('sectionNav');
+  const btnCloseModal=$('btnCloseModal'),backdrop=$('modalBackdrop');
+
+  // ---------- State ----------
   const PAGE_SIZE=10; let page=0,rows=[],headers=[],selectedIndex=-1;
+
+  function buildHeaders(data){ const s=new Set(); data.forEach(r=>Object.keys(r).forEach(k=>s.add(k))); headers=[...s]; }
 
   function renderTable(){
     tableHead.innerHTML = '<tr>'+TABLE_COLUMNS.map(c=>'<th>'+c.label+'</th>').join('')+'</tr>';
@@ -272,16 +168,23 @@ function buildImgWithFallback(srcOrId, cls, size) {
     const tr=ev.target.closest('tr'); if(!tr) return;
     selectedIndex=Number(tr.getAttribute('data-abs-index'));
     document.querySelectorAll('#dataTable tbody tr').forEach(t=>t.classList.remove('selected'));
-    tr.classList.add('selected'); btnEdit.disabled=false; openModal();
+    tr.classList.add('selected');
+openModal();
   });
+
+  function renderKV(k,v){ return `<div class="kv"><div class="k">${k}</div><div class="v">${v||''}</div></div>`; }
+  function renderPhotosBlock(items){ return items.length?`<div class="thumb-grid">`+items.map(it=>buildImgWithFallback(it.url,'',300)).join('')+`</div>`:''; }
 
   function openModal(){
     const rec=rows[selectedIndex]||{};
+    // Expose currently opened record to popup-edit.js
+    window._currentRecord = rec;
+
     const title = getField(rec,['Business Name','Business Name:','Business','Name','Company']) ||
                   getField(rec,['Address','Address:','Site Address','Street Address']) || 'Record';
     modalTitle.textContent = title;
 
-    // tiny thumb left of title
+    // Thumb
     const tw=document.getElementById('modalThumbWrap');
     if(tw){
       const fp=resolveFirstPhoto(rec);
@@ -300,13 +203,13 @@ function buildImgWithFallback(srcOrId, cls, size) {
       });
     });
 
-    // Build sections
+    // Buckets
     const buckets={}; SECTION_CONFIG.forEach(sc=>buckets[sc.id]={kv:[],photos:[]});
     for(const h of headers){
       if(isHiddenInModal(h)) continue;
       const sec=sectionForField(h);
-      if(isPhotoHeader(h)){
-        const urls=String(rec[h]||'').split(/[,\r\n]+|\s{2,}|,\s*/).filter(Boolean);
+      if(/photo/i.test(String(h))){
+        const urls=String(rec[h]||'').split(/[\,\r\n]+|\s{2,}|,\s*/).filter(Boolean);
         for(const u of urls) buckets[sec].photos.push({url:u,sectionId:sec});
       } else {
         const val=String(rec[h]??''); if(val) buckets[sec].kv.push(renderKV(h,val));
@@ -324,11 +227,10 @@ function buildImgWithFallback(srcOrId, cls, size) {
     }
     modalContent.innerHTML = html;
     loadThumbsWithin(modalContent);
-    // Open
+
     if (modal.showModal) modal.showModal(); else { modal.setAttribute('open',''); backdrop.hidden=false; }
   }
 
-  // Close modal (supports non-<dialog> fallback)
   function closeModal(){ if(modal.close) modal.close(); else { modal.removeAttribute('open'); backdrop.hidden=true; } }
   btnCloseModal.addEventListener('click',closeModal);
   backdrop.addEventListener('click',closeModal);
@@ -339,17 +241,19 @@ function buildImgWithFallback(srcOrId, cls, size) {
   prevPage.addEventListener('click',()=>{ if(page>0){ page--; renderTable(); }});
   nextPage.addEventListener('click',()=>{ const total=Math.ceil(rows.length/PAGE_SIZE); if(page<total-1){ page++; renderTable(); }});
 
-  // Search
-  searchInput.addEventListener('input',debounce(()=>{
+  // Search (debounced)
+  function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+  const onSearch = debounce(()=>{
     const q=(searchInput.value||'').trim().toLowerCase();
     if(!q) rows=(window._allRows||[]).slice();
     else rows=(window._allRows||[]).filter(r=>Object.keys(r).some(h=>String(r[h]??'').toLowerCase().includes(q)));
     page=0; renderTable();
-  },200));
+  },200);
+  searchInput.addEventListener('input', onSearch);
 
-  // ---- Bootstrap
+  // Bootstrap
   (async function init(){
     const data=await loadData(); window._allRows=data; buildHeaders(data); rows=data.slice(); renderTable();
   })();
 
-})();
+})(); 

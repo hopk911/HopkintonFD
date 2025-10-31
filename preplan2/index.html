@@ -7,18 +7,48 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" href="data:," />
   <script>
-    window.WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwysXsTCRNZSgj1EkaOqQJYKhQt62KeoQYVriKPszDvv80gpnfeOViYZrKbxrtO17rQVw/exec";
-    window.GOOGLE_SHEET_JSON_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnI5i_UglY6cveM2wxO9R9lOCgNKB44V4wsROjujIg4SVw9oHCrLShe8WsrTUErebWIwp7mwtaNHq9/pub?output=csv";
+    // Runtime config
+    window.WEBAPP_URL = window.WEBAPP_URL || "https://script.google.com/macros/s/AKfycbykO4efgUPVB_tMlkzT1ZDfahXbMnURnGGFTDZYqn8R4XkEEzCg72kjiPqkGsiegHP_Jg/exec";
+    window.GOOGLE_SHEET_JSON_URL = window.GOOGLE_SHEET_JSON_URL || "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnI5i_UglY6cveM2wxO9R9lOCgNKB44V4wsROjujIg4SVw9oHCrLShe8WsrTUErebWIwp7mwtaNHq9/pub?output=csv";
     window.EDIT_SECRET = window.EDIT_SECRET || "changeme";
-    window.__BUILD__ = "v3-fix19-proxy-thumbs";
+    
+    // --- robust WEBAPP_URL resolution ---
+    (function(){
+      const qs = new URLSearchParams(location.search);
+      const qp = qs.get('webapp');
+      if (qp) { try { localStorage.setItem('WEBAPP_URL', qp); } catch(e){} }
+      const stored = (function(){ try { return localStorage.getItem('WEBAPP_URL') || ''; } catch(e){ return ''; } })();
+      const looksTruncated = (u)=>!u || u.includes('...') || u.length<40;
+      if (looksTruncated(window.WEBAPP_URL)) window.WEBAPP_URL = stored || window.WEBAPP_URL;
+      if (looksTruncated(window.WEBAPP_URL)) {
+        console.error('[config] WEBAPP_URL is missing/invalid. Set it via ?webapp=<url> or localStorage.WEBAPP_URL.');
+      } else {
+        console.log('[config] WEBAPP_URL:', window.WEBAPP_URL);
+      }
+      window.addEventListener('DOMContentLoaded', ()=>{
+        const a=document.createElement('a');
+        a.href='#'; a.textContent='Config'; a.style.cssText='position:fixed;right:8px;bottom:8px;font:12px/1.2 system-ui;opacity:.4';
+        a.onclick=(e)=>{e.preventDefault();console.log('[config] WEBAPP_URL:', window.WEBAPP_URL)};
+        document.body.appendChild(a);
+      });
+    })();
+
+    window.__BUILD__ = "popup-edit-2025-10-30T21:03:17";
   </script>
+  <style>
+    /* Hide any stray main-screen Edit button */
+    #btnEdit{ display:none !important; }
+    /* Visual hint for locked fields */
+    .modal .kv.locked .v{ pointer-events:none; opacity:.8; }
+    .modal .kv.locked .k::after{ content:" (locked)"; font-weight:400; opacity:.7; }
+  </style>
 </head>
 <body>
   <header class="app-header">
     <div class="brand">HFD Pre-Plan</div>
     <div class="actions">
       <button id="btnAdd" class="btn">Add New</button>
-      <button id="btnEdit" class="btn" disabled>Edit Selected</button>
+      <!-- Main-screen Edit intentionally removed -->
     </div>
   </header>
 
@@ -43,7 +73,7 @@
     <div class="modal-head">
       <div id="modalThumbWrap" class="modal-thumb"></div>
       <h3 id="modalTitle">Record</h3>
-      <button id="btnToggleEdit" class="btn">Edit</button>
+      <button id="btnModalEdit" class="btn">Edit</button>
       <button id="btnCloseModal" class="btn secondary">Close</button>
     </div>
     <div id="sectionNav" class="section-nav"></div>
@@ -51,32 +81,15 @@
   </dialog>
   <div id="modalBackdrop" class="modal-backdrop" hidden></div>
 
-  <script src="app.driveonly.v2.js?v=v3-fix19-proxy-thumbs"></script>
-<script src="app.js"></script>
-<script src="app.driveonly.v2.js"></script>
-
-  <!-- other-row-tagger -->
+  <!-- Shim to neutralize any old bundles that still reference main-screen btnEdit -->
   <script>
-    (function(){
-      var modal = document.getElementById('recordModal');
-      var body  = document.getElementById('modalContent');
-      if (!modal || !body) return;
-      var ROW_SEL   = '.detail-row, .row, .field';
-      var LABEL_SEL = '.field-label, .label, .key';
-      function tagOtherRow(){
-        var rows = body.querySelectorAll(ROW_SEL);
-        rows.forEach(function(row){
-          var label = row.querySelector(LABEL_SEL);
-          if (!label) return;
-          var txt = (label.textContent || '').trim().toLowerCase();
-          if (txt.indexOf('other') === 0) { row.classList.add('is-other-row'); }
-          else { row.classList.remove('is-other-row'); }
-        });
-      }
-      new MutationObserver(tagOtherRow).observe(body, { childList: true, subtree: true });
-      tagOtherRow();
-    })();
+    if (typeof window.btnEdit === 'undefined') { 
+      window.btnEdit = { addEventListener(){}, set disabled(_){}, get disabled(){ return false; } }; 
+    }
   </script>
 
+  <!-- Cache-busted bundle and popup editor -->
+  <script defer src="app.bundle.js?v=popup-edit"></script>
+  <script defer src="popup-edit.js?v=popup-edit"></script>
 </body>
 </html>
