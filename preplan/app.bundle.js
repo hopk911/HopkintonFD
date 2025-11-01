@@ -182,7 +182,13 @@ function ensureHeaders(){
 openModal();
   });
 
-  function renderKV(k,v){ return `<div class="kv"><div class="k">${k}</div><div class="v">${v||''}</div></div>`; }
+  function renderKV(k,v){
+  var _v = (v==null? '' : String(v));
+  var _empty = !_v.trim();
+  var cls = 'kv' + (_empty ? ' empty' : '');
+  return '<div class="' + cls + '"><div class="k">' + k + '</div><div class="v">' + _v + '</div></div>';
+}
+
   function renderPhotosBlock(items){ return items.length?`<div class="thumb-grid">`+items.map(it=>buildImgWithFallback(it.url,'',300)).join('')+`</div>`:''; }
 
   function openModal(){
@@ -217,13 +223,14 @@ openModal();
     // Buckets
     const buckets={}; SECTION_CONFIG.forEach(sc=>buckets[sc.id]={kv:[],photos:[]});
     for(const h of headers){
-      if(isHiddenInModal(h)) continue;
+      const __editing=(function(){try{return document.getElementById('recordModal')?.classList.contains('editing')}catch(e){return false}})();
+      if(isHiddenInModal(h) && !__editing) continue;
       const sec=sectionForField(h);
       if(/photo/i.test(String(h))){
         const urls=String(rec[h]||'').split(/[\,\r\n]+|\s{2,}|,\s*/).filter(Boolean);
         for(const u of urls) buckets[sec].photos.push({url:u,sectionId:sec});
       } else {
-        const val=String(rec[h]??''); if(val || (window && window._isNewDraft)) buckets[sec].kv.push(renderKV(h,val));
+        const val=String(rec[h]??''); buckets[sec].kv.push(renderKV(h,val));
       }
     }
     let html='';

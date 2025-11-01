@@ -71,3 +71,6 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 #recordModal #modalContent .section[data-color="other"] .thumb-grid img { 
   display: none !important; 
 }
+
+.kv.empty{display:none}
+.modal.editing .kv.empty{display:block}

@@ -11,8 +11,8 @@
 var WEBAPP_VERSION = '2025-10-30';
 
 // ===== CONFIG =====
-var SPREADSHEET_ID = '1B1JbGtXAl-ymNQ-vb4UBRwZZ36byfu3fva0XpstidNA';
-var SHEET_NAME = 'Form Responses';
+var SPREADSHEET_ID = 'PUT_YOUR_SHEET_ID_HERE';
+var SHEET_NAME = 'Preplans';
 var KEY_COL_HEADER = 'Stable ID';
 // ==================
 
@@ -300,22 +300,4 @@ function helpText_() {
     'Save (POST form or raw JSON to /exec with fn=save)'
   ];
   return lines.join('\n');
-}
-
-
-// Sheet resolution helper
-function getSheet_(nameOpt) {
-  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  if (nameOpt) {
-    var sh = ss.getSheetByName(nameOpt);
-    if (sh) return sh;
-  }
-  var sheets = ss.getSheets();
-  for (var i=0; i<sheets.length; i++) {
-    var sh2 = sheets[i];
-    var lastCol = Math.max(1, sh2.getLastColumn());
-    var hdr = sh2.getRange(1,1,1,lastCol).getValues()[0];
-    if (hdr.indexOf(KEY_COL_HEADER) !== -1) return sh2;
-  }
-  return sheets[0];
 }
