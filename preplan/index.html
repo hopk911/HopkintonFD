@@ -89,7 +89,39 @@
   </script>
 
   <!-- Cache-busted bundle and popup editor -->
-  <script defer src="app.bundle.js?v=popup-edit"></script>
-  <script defer src="popup-edit.js?v=popup-edit"></script>
+<script src="app.bundle.js"></script>
+<script src="app.js"></script>
+\1
+
+
+<script src="popup-edit.js"></script>
+<!-- Tiny hotfix: auto-enter editing for brand-new draft so empty fields are visible -->
+<script>
+(function(){
+  function setup(){
+    var modal = document.getElementById('recordModal');
+    if(!modal) return;
+    var obs = new MutationObserver(function(muts){
+      if (modal.hasAttribute('open') && (window._isNewDraft === true)) {
+        // Defer to allow modal content to render
+        requestAnimationFrame(function(){
+          var btn = document.getElementById('btnModalEdit');
+          if (btn && !modal.classList.contains('editing')) {
+            try { btn.click(); } catch(e){ /* noop */ }
+          }
+        });
+      }
+    });
+    obs.observe(modal, { attributes: true, attributeFilter: ['open'] });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setup);
+  } else {
+    setup();
+  }
+})();
+</script>
+
+<script src="hfd-upload-injector.js"></script>
 </body>
 </html>

@@ -21,14 +21,15 @@
     return '';
   }
   function buildImgWithFallback(srcOrId, cls, size){
-    if (!srcOrId) return '';
-    const w = size || 600;
-    const id = extractDriveId(srcOrId);
-    const url = id ? ('https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w' + w)
-                   : String(srcOrId);
-    const klass = cls ? (' ' + cls) : '';
-    return '<img src="' + url + '" class="thumb' + klass + '" loading="lazy" alt="photo">';
-  }
+  if (!srcOrId) return '';
+  const w = size || 600;
+  const id = extractDriveId(srcOrId);
+  const driveThumb = id ? ('https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w' + w) : String(srcOrId);
+  const webapp = (window.WEBAPP_URL||'').replace(/\/$/,'');
+  const proxied = id && webapp ? (webapp + '?id=' + encodeURIComponent(id) + '&w=' + w) : driveThumb;
+  const klass = cls ? (' ' + cls) : '';
+  return '<img src="' + proxied + '" class="thumb' + klass + '" loading="lazy" alt="photo">';
+}
   function loadThumbsWithin(){ /* no-op in drive-only mode */ }
 
   // ---------- Sections & routing ----------
@@ -60,6 +61,7 @@
     [/^Sprinkler Main Shutoff Location:?$/i,'fire'],
     [/^Roof Type:?$/i,'other'],
     [/^Roof Access Location:?$/i,'other'],
+    [/^\s*Roof Access Photo\s*:?\s*$/i,'other'],
     [/^(fdc|standpipe|riser|fire pump|alarm|pull|extinguisher|ladder|stair|roof|pre plan|knox)/i,'fire'],
     [/(^| )(elevators?|lift|elevator bank|elevator key|elevator room|elev\b)/i,'elevators'],
     [/(^| )(ems|aed|narcan|medical)/i,'ems'],
@@ -188,8 +190,7 @@ openModal();
   var cls = 'kv' + (_empty ? ' empty' : '');
   return '<div class="' + cls + '"><div class="k">' + k + '</div><div class="v">' + _v + '</div></div>';
 }
-
-  function renderPhotosBlock(items){ return items.length?`<div class="thumb-grid">`+items.map(it=>buildImgWithFallback(it.url,'',300)).join('')+`</div>`:''; }
+function renderPhotosBlock(items){ return items.length?`<div class="thumb-grid">`+items.map(it=>buildImgWithFallback(it.url,'',300)).join('')+`</div>`:''; }
 
   function openModal(){
     const rec=rows[selectedIndex]||{};
@@ -223,8 +224,7 @@ openModal();
     // Buckets
     const buckets={}; SECTION_CONFIG.forEach(sc=>buckets[sc.id]={kv:[],photos:[]});
     for(const h of headers){
-      const __editing=(function(){try{return document.getElementById('recordModal')?.classList.contains('editing')}catch(e){return false}})();
-      if(isHiddenInModal(h) && !__editing) continue;
+      if(isHiddenInModal(h)) continue;
       const sec=sectionForField(h);
       if(/photo/i.test(String(h))){
         const urls=String(rec[h]||'').split(/[\,\r\n]+|\s{2,}|,\s*/).filter(Boolean);

@@ -33,12 +33,19 @@
   const normalizeKey = k => String(k||'').toLowerCase().replace(/[:\s]+$/,'').replace(/[^a-z0-9]+/g,' ').trim();
   const isHiddenInModal = k => HIDE_IN_MODAL.includes(normalizeKey(k));
 
-  // ---- Field routing to sections
+  
+  const DRAFT_HIDE = ['timestamp','time stamp','stable id'];
+  function shouldHideInModal(k){
+    try{ if (window && window._isNewDraft) return DRAFT_HIDE.includes(normalizeKey(k)); }catch(e){}
+    return isHiddenInModal(k);
+  }
+// ---- Field routing to sections
   const FIELD_PATTERNS = [
     [/^Remote Alarm Location:?$/i,'fire'],
     [/^Sprinkler Main Shutoff Location:?$/i,'fire'],
     [/^Roof Type:?$/i,'other'],
     [/^Roof Access Location:?$/i,'other'],
+    [/^\s*Roof Access Photo\s*:?\s*$/i,'other'],
     [/^(fdc|standpipe|riser|fire pump|alarm|pull|extinguisher|ladder|stair|roof|pre plan|knox)/i,'fire'],
     [/(^| )(elevators?|lift|elevator bank|elevator key|elevator room|elev\b)/i,'elevators'],
     [/(^| )(ems|aed|narcan|medical)/i,'ems'],
@@ -95,14 +102,11 @@ function buildImgWithFallback(srcOrId, cls, size) {
   if (!srcOrId) return '';
   const w = size || 600;
   const id = extractDriveId(srcOrId);
-
-  // Drive thumbnail only (avoids lh3 429s)
-  const url = id
-    ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w}`
-    : String(srcOrId);
-
+  const driveThumb = id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w}` : String(srcOrId);
+  const webapp = (window.WEBAPP_URL||'').replace(/\/$/,'');
+  const proxied = id ? `${webapp}?id=${encodeURIComponent(id)}&w=${w}` : driveThumb;
   const classAttr = cls ? ` class="${cls} js-thumb"` : ' class="js-thumb"';
-  return `<img data-src="${url}" alt="photo" loading="lazy"${classAttr}>`;
+  return `<img data-src="${proxied}" data-fallback="${driveThumb}" alt="photo" loading="lazy"${classAttr}>`;
 }
 
   // --- Backoff & fetch helpers to tame 429s ---
@@ -272,7 +276,7 @@ function buildImgWithFallback(srcOrId, cls, size) {
     const tr=ev.target.closest('tr'); if(!tr) return;
     selectedIndex=Number(tr.getAttribute('data-abs-index'));
     document.querySelectorAll('#dataTable tbody tr').forEach(t=>t.classList.remove('selected'));
-    tr.classList.add('selected'); btnEdit.disabled=false; openModal();
+    tr.classList.add('selected'); if (btnEdit) { btnEdit.disabled=false; } openModal();
   });
 
   function openModal(){
@@ -303,18 +307,23 @@ function buildImgWithFallback(srcOrId, cls, size) {
     // Build sections
     const buckets={}; SECTION_CONFIG.forEach(sc=>buckets[sc.id]={kv:[],photos:[]});
     for(const h of headers){
-      if(isHiddenInModal(h)) continue;
-      const sec=sectionForField(h);
-      if(isPhotoHeader(h)){
-        const urls=String(rec[h]||'').split(/[,\r\n]+|\s{2,}|,\s*/).filter(Boolean);
-        for(const u of urls) buckets[sec].photos.push({url:u,sectionId:sec});
-      } else {
-        const val=String(rec[h]??''); if(val) buckets[sec].kv.push(renderKV(h,val));
-      }
-    }
+  if(shouldHideInModal(h)) continue;
+  const sec = sectionForField(h);
+  if(isPhotoHeader(h)){
+    const urls = String(rec[h]||'').split(/[\,\r\n]+|\s{2,}|,\s*/).filter(Boolean);
+    for(const u of urls) buckets[sec].photos.push({url:u, sectionId:sec});
+    // NEW: For new drafts with no photo yet, ensure the section renders so upload buttons can mount
+    if ((!urls.length) && window._isNewDraft) { buckets[sec].kv.push(renderKV(h, '')); }
+  } else {
+    const val = String(rec[h]??'');
+    if (val) buckets[sec].kv.push(renderKV(h, val));
+    else if (window._isNewDraft) buckets[sec].kv.push(renderKV(h, ''));
+  }
+}
     let html='';
     for(const sc of SECTION_CONFIG){
-      const {kv,photos}=buckets[sc.id]; if(!kv.length && !photos.length) continue;
+  const {kv,photos} = buckets[sc.id];
+  if (!window._isNewDraft && !kv.length && !photos.length) continue;
       const label = sc.id==='other' ? title : sc.label;
       html += `<section id="section-${sc.id}" class="section" data-color="${sc.color}">
         <h3>${label}</h3>
@@ -334,8 +343,8 @@ function buildImgWithFallback(srcOrId, cls, size) {
   backdrop.addEventListener('click',closeModal);
 
   // Toolbar actions
-  btnAdd.addEventListener('click',()=>{ const blank={}; headers.forEach(h=>blank[h]=''); rows.unshift(blank); selectedIndex=0; openModal(); });
-  btnEdit.addEventListener('click',()=>{ if(selectedIndex>=0) openModal(); });
+  btnAdd.addEventListener('click',()=>{ const blank={ __isNew:true }; headers.forEach(h=>blank[h]=''); rows.unshift(blank); selectedIndex=0; openModal(); });
+  if (btnEdit) btnEdit.addEventListener('click',()=>{ if(selectedIndex>=0) openModal(); });
   prevPage.addEventListener('click',()=>{ if(page>0){ page--; renderTable(); }});
   nextPage.addEventListener('click',()=>{ const total=Math.ceil(rows.length/PAGE_SIZE); if(page<total-1){ page++; renderTable(); }});
 
@@ -352,4 +361,30 @@ function buildImgWithFallback(srcOrId, cls, size) {
     const data=await loadData(); window._allRows=data; buildHeaders(data); rows=data.slice(); renderTable();
   })();
 
+})();
+
+
+// ---- Robust modal button wiring (delegation; safe if buttons aren't in DOM yet) ----
+(function () {
+  document.addEventListener('click', function (e) {
+    const t = e.target.closest('#btnModalEdit, #btnModalDone, #btnModalClose');
+    if (!t) return;
+
+    // Prefer your existing helpers if present
+    if (t.id === 'btnModalEdit') {
+      e.preventDefault();
+      try { setEditable(true); } catch (_) {}        // defined in popup-edit.js
+    }
+    if (t.id === 'btnModalDone') {
+      e.preventDefault();
+      try { saveEdits(); } catch (_) {}              // defined in popup-edit.js
+    }
+    if (t.id === 'btnModalClose') {
+      e.preventDefault();
+      try { closeModal && closeModal(); } catch (_) {}
+      // Fallback close if no helper:
+      const m = document.getElementById('recordModal');
+      if (m) { if (typeof m.close === 'function') m.close(); else m.removeAttribute('open'); }
+    }
+  });
 })();

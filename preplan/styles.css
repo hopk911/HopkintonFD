@@ -68,9 +68,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 #recordModal #modalContent .is-other-row img { display: none !important; }
 
 /* Hide photos only in 'Other' section (modal) */
-#recordModal #modalContent .section[data-color="other"] .thumb-grid img { 
-  display: none !important; 
-}
 
+/* Empty-field visibility */
 .kv.empty{display:none}
-.modal.editing .kv.empty{display:block}
+#recordModal.editing .kv.empty{display:block}

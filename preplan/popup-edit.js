@@ -6,11 +6,47 @@
   const modal   = document.getElementById('recordModal');
   const content = document.getElementById('modalContent');
   const btn     = document.getElementById('btnModalEdit');
+  let __editObserverGuard = false;
+
+// === Dropdown config (single source of truth) ===
+const OCCUPANCY_OPTIONS = [
+  'Apartment','Assembly','Ambulatory Health Care','Business','Day Care','Detention and Correctional','Educational','Factory/Industrial','Health Care','High Hazard','Institutional','Mercantile','Mixed Use','One and Two Family Dwelling','Residential Board and Care','Storage','Utility/Misc','Vacant', 'Other', 'Unknown'
+];
+const CONSTRUCTION_TYPE_OPTIONS = ['Type I (Fire Resistive)','Type II (Non-Combustible)','Type III (Ordinary)','Type IV (Heavy Timber)','Type V (Wood Frame)'];
+const ROOF_TYPE_OPTIONS = ['Flat','Pitched','Arch','Metal','Membrane','Hip','Gable','Gambrel','Mansard','Other'];
+const ELEVATOR_TYPE_OPTIONS = ['Hydraulic','Traction','Machine-Room-Less (MRL)','None','Unknown'];
+const ALARM_TYPE_OPTIONS = ['Local','Central Station','Proprietary','Remote Supervising','None','Unknown'];
+
+const FIELD_SELECTS = {
+  'occupancy': OCCUPANCY_OPTIONS,
+  'construction type': CONSTRUCTION_TYPE_OPTIONS,
+  'roof type': ROOF_TYPE_OPTIONS,
+  'elevator type': ELEVATOR_TYPE_OPTIONS,
+  'alarm type': ALARM_TYPE_OPTIONS
+};
+// === End dropdown config ===
+
+// --- Dropdown option sets ---
+
+
+
+
+
+
+// Map normalized header -> options
+
+
+  // Editable dropdown options
+  
+
 
   if (!modal || !content || !btn) {
     console.warn('[popup-edit] Required elements not found. Aborting.');
     alert('Edit UI not initialized: required elements missing.');
     return;
+  
+    // allow DOM to settle, then re-enable observer
+    setTimeout(() => { __editObserverGuard = false; }, 0);
   }
 
   const WEBAPP_URL  = (window && window.WEBAPP_URL)  || '';
@@ -38,6 +74,9 @@
   let editing = false;
 
   function setEditable(on){
+
+  __editObserverGuard = true;
+  try {
     editing = !!on;
     modal.classList.toggle('editing', editing);
     btn.classList.toggle('toggled', editing);
@@ -48,28 +87,63 @@
       const kEl = row.querySelector('.k');
       const vEl = row.querySelector('.v');
       if (!kEl || !vEl) return;
+
       const locked = isLocked(kEl.innerText);
       row.classList.toggle('locked', locked);
+
+      // Normalize header (strip trailing colon, lower case)
+      const keyText = (kEl.innerText || '').trim();
+      const normKey = keyText.replace(/:\s*$/, '').trim();
+      const normKeyLower = normKey.toLowerCase();
+
       if (editing && !locked){
-        vEl.setAttribute('contenteditable','true');
+        // If this field has a select defined, render select; else use contenteditable
+        const opts = FIELD_SELECTS[normKeyLower];
+        if (opts && !vEl.querySelector('select[data-editor]')){
+          const current = (vEl.innerText||'').trim();
+          vEl.removeAttribute('contenteditable');
+          const sel = document.createElement('select');
+          sel.setAttribute('data-editor', normKeyLower);
+          opts.forEach(opt => { const o=document.createElement('option'); o.value=opt; o.textContent=opt; sel.appendChild(o); });
+          if (current) sel.value = current;
+          vEl.textContent = '';
+          vEl.appendChild(sel);
+        } else {
+          vEl.setAttribute('contenteditable','true');
+        }
         if (!vEl.hasAttribute('data-original')) vEl.setAttribute('data-original', vEl.innerText);
       } else {
+        // Leaving edit: collapse any selects to text
+        const sel = vEl.querySelector('select[data-editor]');
+        if (sel) { vEl.textContent = sel.value || ''; }
         vEl.removeAttribute('contenteditable');
       }
     });
+  } finally {
+    setTimeout(() => { __editObserverGuard = false; }, 0);
   }
 
-  function collectFromPopup(){
-    const data = {};
-    const rows = content.querySelectorAll('.kv');
-    rows.forEach(row => {
-      const k = (row.querySelector('.k')?.innerText || '').trim();
-      const v = (row.querySelector('.v')?.innerText || '').trim();
-      if (k) data[k] = v;
-    });
-    return data;
-  }
+}
 
+
+
+  
+function collectFromPopup(){
+  const data = {};
+  const rows = content.querySelectorAll('.kv');
+  rows.forEach(row => {
+    const k = (row.querySelector('.k')?.innerText || '').trim();
+    if (!k) return;
+    const vWrap = row.querySelector('.v');
+    let v = '';
+    if (vWrap){
+      const sel = vWrap.querySelector('select[data-editor]');
+      if (sel) v = sel.value; else v = (vWrap.innerText || '').trim();
+    }
+    data[k] = v;
+  });
+  return data;
+}
   function getCurrentRecord(){
     // Prefer record exposed by the bundle when modal opens
     // (openModal in the bundle sets window._currentRecord when we patched it)
@@ -159,6 +233,6 @@
   try{ if (window && window._isNewDraft) setEditable(true); }catch(e){}
 
   // If modal content re-renders while editing, exit edit mode to avoid stale state
-  const observer = new MutationObserver(() => { if (editing) setEditable(false); });
+  const observer = new MutationObserver(() => { if (__editObserverGuard) return; if (editing) setEditable(false); });
   observer.observe(content, { childList: true });
 })();

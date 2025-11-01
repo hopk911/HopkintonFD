@@ -11,9 +11,13 @@
 var WEBAPP_VERSION = '2025-10-30';
 
 // ===== CONFIG =====
-var SPREADSHEET_ID = 'PUT_YOUR_SHEET_ID_HERE';
-var SHEET_NAME = 'Preplans';
+var SPREADSHEET_ID = '1B1JbGtXAl-ymNQ-vb4UBRwZZ36byfu3fva0XpstidNA';
+var SHEET_NAME = 'Form Responses';
 var KEY_COL_HEADER = 'Stable ID';
+
+var UPLOAD_FOLDER_ID = '1B8arDmBagHIENkVhuVOxk0TX9l9TnJ4RQXUgb1XPqBZ5jbi2r6SVAxPmO-wUaEzaExOuLcAx';
+var PHOTO_FOLDER_ID = '1AZWEVmdqmuUZceORmi24ULowcuPURGvWwIB4rJKklGkaIx8M_5jl789mHLLwQoCvtLOWrQHj';
+
 // ==================
 
 function doGet(e) {
@@ -53,11 +57,52 @@ function doGet(e) {
 
 function doPost(e) {
   try {
-    return handleSave_({ method: 'POST', post: e });
+    var fn = (e && e.parameter && e.parameter.fn) ? String(e.parameter.fn) : '';
+
+    // 1) Route uploads FIRST
+    if (fn === 'upload')    return handleUpload_(e);    // multipart/form-data
+    if (fn === 'uploadB64') return handleUploadB64_(e); // base64 fallback
+
+    // 2) Save (legacy + current)
+    if (fn === 'save') return handleSave_({ method: 'POST', post: e });
+    // Legacy fallback if no fn but a payload param was sent
+    if (e && e.parameter && typeof e.parameter.payload !== 'undefined') {
+      return handleSave_({ method: 'POST', post: e });
+    }
+
+    return _json({ ok: false, error: 'Unknown fn or missing payload' }, 400);
   } catch (err) {
-    Logger.log('doPost error: ' + (err && err.stack ? err.stack : err));
-    return _json({ ok: false, error: String(err) }, 500);
+    return _json({ ok: false, error: String(err && err.stack || err) }, 500);
   }
+}
+
+
+// ===== Upload (multipart) =====
+/**
+ * POST /exec  with multipart/form-data:
+ * fields: fn=upload, folderId?=..., file=<binary>
+ * Returns: {ok:true, id, link, name}
+ */
+function handleUpload_(e){
+  var folderId = (e && e.parameter && e.parameter.folderId) ? String(e.parameter.folderId) : '';
+  var folder;
+  try{
+    folder = folderId ? DriveApp.getFolderById(folderId) : (UPLOAD_FOLDER_ID ? DriveApp.getFolderById(UPLOAD_FOLDER_ID) : DriveApp.getRootFolder());
+  }catch(err){
+    folder = DriveApp.getRootFolder();
+  }
+  if (!e || !e.files || !e.files.file){
+    return _json({ ok:false, error:'No file field found (name="file").' }, 400);
+  }
+  var blob = e.files.file; // Blob
+  if (!blob) return _json({ ok:false, error:'Empty file' }, 400);
+  var name = blob.getName() || ('upload-' + Date.now());
+  var file = folder.createFile(blob.copyBlob().setName(name));
+  // Make viewable by link
+  try{ file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); }catch(e){}
+  var id = file.getId();
+  var link = 'https://drive.google.com/uc?id=' + id;
+  return _json({ ok:true, id:id, link:link, name:name }, 200);
 }
 
 /* ---------- Image proxy ---------- */
@@ -300,4 +345,33 @@ function helpText_() {
     'Save (POST form or raw JSON to /exec with fn=save)'
   ];
   return lines.join('\n');
+}
+
+
+/** Upload via base64 (fallback when e.files is unavailable) */
+function handleUploadB64_(e){
+  var p = (e && e.parameter) ? e.parameter : {};
+  var folderId = (p.folderId || '').trim();
+  var name = (p.name || ('upload-' + Date.now()));
+  var data = p.data || '';
+  if (!folderId) return _json({ ok:false, error:'Missing folderId' }, 400);
+  if (!data) return _json({ ok:false, error:'Missing data' }, 400);
+
+  // Accept data URLs like "data:image/jpeg;base64,...." or raw base64
+  var base64 = data;
+  var m = String(data).match(/^data:.*?;base64,(.*)$/);
+  if (m) base64 = m[1];
+
+  var bytes;
+  try{ bytes = Utilities.base64Decode(base64); }catch(err){ return _json({ ok:false, error:'Bad base64' }, 400); }
+  var blob = Utilities.newBlob(bytes, 'application/octet-stream', name);
+
+  var folder;
+  try { folder = DriveApp.getFolderById(folderId); } catch(err){ return _json({ ok:false, error:'Invalid folderId' }, 400); }
+  var file = folder.createFile(blob);
+  try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+
+  var id = file.getId();
+  var link = 'https://drive.google.com/uc?id=' + id;
+  return _json({ ok:true, id:id, link:link, name:name }, 200);
 }
