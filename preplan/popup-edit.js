@@ -138,6 +138,8 @@
     try {
       const data = await saveViaJSONP(WEBAPP_URL, payload);
       console.log('[popup-edit] JSONP response:', data);
+      try{ if(window && window._currentRecord) window._currentRecord.__saved = true; }catch(e){}
+
       setEditable(false);
       setTimeout(() => location.reload(), 250);
     } catch (e) {
@@ -154,6 +156,7 @@
     if (!editing) setEditable(true);
     else saveEdits();
   });
+  try{ if (window && window._isNewDraft) setEditable(true); }catch(e){}
 
   // If modal content re-renders while editing, exit edit mode to avoid stale state
   const observer = new MutationObserver(() => { if (editing) setEditable(false); });

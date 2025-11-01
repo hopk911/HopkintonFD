@@ -1,168 +1,95 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <link rel="icon" href="data:,">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HFD Pre-Plan Overview</title>
+  <title>HFD Pre-Plan</title>
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="colors-and-modal.css">
-  <!-- Leaflet for the mini map -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Esri Leaflet (no integrity/crossorigin to avoid local SRI issues) -->
-  <script src="https://unpkg.com/esri-leaflet@3.0.10/dist/esri-leaflet.js"></script>
+  <link rel="icon" href="data:," />
+  <script>
+    // Runtime config
+    window.WEBAPP_URL = window.WEBAPP_URL || "https://script.google.com/macros/s/AKfycbykO4efgUPVB_tMlkzT1ZDfahXbMnURnGGFTDZYqn8R4XkEEzCg72kjiPqkGsiegHP_Jg/exec";
+    window.GOOGLE_SHEET_JSON_URL = window.GOOGLE_SHEET_JSON_URL || "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnI5i_UglY6cveM2wxO9R9lOCgNKB44V4wsROjujIg4SVw9oHCrLShe8WsrTUErebWIwp7mwtaNHq9/pub?output=csv";
+    window.EDIT_SECRET = window.EDIT_SECRET || "changeme";
+    
+    // --- robust WEBAPP_URL resolution ---
+    (function(){
+      const qs = new URLSearchParams(location.search);
+      const qp = qs.get('webapp');
+      if (qp) { try { localStorage.setItem('WEBAPP_URL', qp); } catch(e){} }
+      const stored = (function(){ try { return localStorage.getItem('WEBAPP_URL') || ''; } catch(e){ return ''; } })();
+      const looksTruncated = (u)=>!u || u.includes('...') || u.length<40;
+      if (looksTruncated(window.WEBAPP_URL)) window.WEBAPP_URL = stored || window.WEBAPP_URL;
+      if (looksTruncated(window.WEBAPP_URL)) {
+        console.error('[config] WEBAPP_URL is missing/invalid. Set it via ?webapp=<url> or localStorage.WEBAPP_URL.');
+      } else {
+        console.log('[config] WEBAPP_URL:', window.WEBAPP_URL);
+      }
+      window.addEventListener('DOMContentLoaded', ()=>{
+        const a=document.createElement('a');
+        a.href='#'; a.textContent='Config'; a.style.cssText='position:fixed;right:8px;bottom:8px;font:12px/1.2 system-ui;opacity:.4';
+        a.onclick=(e)=>{e.preventDefault();console.log('[config] WEBAPP_URL:', window.WEBAPP_URL)};
+        document.body.appendChild(a);
+      });
+    })();
+
+    window.__BUILD__ = "popup-edit-2025-10-30T21:03:17";
+  </script>
+  <style>
+    /* Hide any stray main-screen Edit button */
+    #btnEdit{ display:none !important; }
+    /* Visual hint for locked fields */
+    .modal .kv.locked .v{ pointer-events:none; opacity:.8; }
+    .modal .kv.locked .k::after{ content:" (locked)"; font-weight:400; opacity:.7; }
+  </style>
 </head>
 <body>
-  <!-- Left vertical icon nav -->
-  <aside class="side-nav" aria-label="Section navigation">
-    <a href="#contact" class="nav-btn" title="Contact" aria-label="Contact">
-  <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 12c2.8 0 5-2.2 5-5S14.8 2 12 2 7 4.2 7 7s2.2 5 5 5zm0 2c-3.9 0-7 2.1-7 5v1h14v-1c0-2.9-3.1-5-7-5z" fill="currentColor"/></svg>
-</a>
-    <a href="#fire" class="nav-btn" title="Fire" aria-label="Fire">
-      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2c1 3-1 4-1 6 0 2 2 3 2 5 0 2-2 4-4 4s-4-2-4-5c0-5 5-7 7-10zM12 22c3 0 6-3 6-7 0-5-5-7-5-11 4 2 7 7 7 11 0 5-4 9-8 9-2 0-4-.7-5.5-2 1.5 0 3.5-.5 5.5-0z" fill="currentColor"/></svg>
-    </a>
-    <a href="#ems" class="nav-btn" title="EMS" aria-label="EMS">
-      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M10 2h4v6h6v4h-6v6h-4v-6H4V8h6z" fill="currentColor"/></svg>
-    </a>
-    <a href="#water" class="nav-btn" title="Water" aria-label="Water">
-      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2s6 7 6 11a6 6 0 1 1-12 0c0-4 6-11 6-11z" fill="currentColor"/></svg>
-    </a>
-    <a href="#gas" class="nav-btn" title="Gas" aria-label="Gas">
-      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3c2 3 5 6 5 9a5 5 0 1 1-10 0c0-3 3-6 5-9z" fill="currentColor"/></svg>
-    </a>
-    <a href="#electric" class="nav-btn" title="Electric" aria-label="Electric">
-      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M13 2 3 14h7l-1 8 10-12h-7z" fill="currentColor"/></svg>
-    </a>
-    <a href="#hazmat" class="nav-btn" title="Hazmat" aria-label="Hazmat">
-      <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v6M12 16v6M2 12h6M16 12h6M4.9 4.9l4.2 4.2M14.9 14.9l4.2 4.2M19.1 4.9l-4.2 4.2M9.1 14.9l-4.2 4.2" stroke="currentColor" stroke-width="2" fill="none"/></svg>
-    </a>
-    <a href="#construction" class="nav-btn" title="Construction" aria-label="Construction">
-      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 14a8 8 0 0 1 16 0v3H4v-3zM10 10V7h4v3" stroke="currentColor" stroke-width="2" fill="none"/></svg>
-    </a>
-    <a href="#elevator" class="nav-btn" title="Elevator" aria-label="Elevator">
-      <svg viewBox="0 0 24 24" width="20" height="20"><rect x="6" y="5" width="12" height="14" rx="1" ry="1" stroke="currentColor" stroke-width="2" fill="none"/><path d="M10 9h4v6h-4zM12 2v3" stroke="currentColor" stroke-width="2"/></svg>
-    </a>
-  </aside>
-
-  <main class="content">
-    <header class="page-header">
-      <form id="search-form" class="search" role="search" autocomplete="off">
-        <input id="search-input" class="search-input" placeholder="Search address or business..." aria-label="Search address or business" />
-        <button class="search-btn" type="submit" aria-label="Search">Search</button>
-</form>
-      <h1 id="page-title">Pre-Plan</h1>
-    </header>
-
-<!-- Title + search stay as-is -->
-
-<!-- General Contact + Map -->
-<section class="intro" id="intro" hidden>
-  <!-- your General Contact tile + map wrapper live here -->
-  <div id="map-wrapper" hidden>
-    <div id="map" aria-label="Parcel Map"></div>
-  </div>
-</section>
-
-    <section class="tiles">
-      <article class="tile fire" id="fire" aria-labelledby="fire-title">
-        <div class="tile-head"><h3 class="tile-title" id="fire-title">Fire</h3></div>
-        <div class="tile-body" id="fire-body"></div>
-        <div class="thumbs" id="fire-photos"></div>
-      </article>
-      <article class="tile ems" id="ems" aria-labelledby="ems-title">
-        <div class="tile-head"><h3 class="tile-title" id="ems-title">EMS</h3></div>
-        <div class="tile-body" id="ems-body"></div>
-        <div class="thumbs" id="ems-photos"></div>
-      </article>
-      <article class="tile water" id="water" aria-labelledby="water-title">
-        <div class="tile-head"><h3 class="tile-title" id="water-title">Water</h3></div>
-        <div class="tile-body" id="water-body"></div>
-        <div class="thumbs" id="water-photos"></div>
-      </article>
-      <article class="tile gas" id="gas" aria-labelledby="gas-title">
-        <div class="tile-head"><h3 class="tile-title" id="gas-title">Gas</h3></div>
-        <div class="tile-body" id="gas-body"></div>
-        <div class="thumbs" id="gas-photos"></div>
-      </article>
-      <article class="tile electric" id="electric" aria-labelledby="electric-title">
-        <div class="tile-head"><h3 class="tile-title" id="electric-title">Electric</h3></div>
-        <div class="tile-body" id="electric-body"></div>
-        <div class="thumbs" id="electric-photos"></div>
-      </article>
-      <article class="tile hazmat" id="hazmat" aria-labelledby="hazmat-title">
-        <div class="tile-head"><h3 class="tile-title" id="hazmat-title">Hazmat</h3></div>
-        <div class="tile-body" id="hazmat-body"></div>
-        <div class="thumbs" id="hazmat-photos"></div>
-      </article>
-      <article class="tile construction" id="construction" aria-labelledby="construction-title">
-        <div class="tile-head"><h3 class="tile-title" id="construction-title">Construction</h3></div>
-        <div class="tile-body" id="construction-body"></div>
-        <div class="thumbs" id="construction-photos"></div>
-      </article>
-      <article class="tile elevator" id="elevator" aria-labelledby="elevator-title">
-        <div class="tile-head"><h3 class="tile-title" id="elevator-title">Elevator</h3></div>
-        <div class="tile-body" id="elevator-body"></div>
-        <div class="thumbs" id="elevator-photos"></div>
-      </article>
-    </section>
-  </main>
-
-  <!-- Simple image popup -->
-  <dialog class="img-modal" id="img-modal">
-  <div class="modal-inner">
-
-    <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
-    <img id="modal-img" alt="Preview" />
-    <div id="modal-caption" class="modal-caption"></div>
-  
-  </div>
-</dialog>
-
-<!-- Inline config MUST come before app.js -->
-<script>
-
-window.WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwysXsTCRNZSgj1EkaOqQJYKhQt62KeoQyVriKPszDvv80gpnfeOViYZrKbxrtO17rQVw/exec';
-
-window.GOOGLE_SHEET_JSON_URL = 'https://docs.google.com/spreadsheets/d/1B1JbGtXAl-ymNQ-vb4UBRwZZ36byfu3fva0XpstidNA/gviz/tq?sheet=Form%20Responses';
-
-window.EDIT_SECRET = '87s3f8yh3ms8yhmd38tyhm3dtgshms83yshgmhyc83yhmtg';
-
-</script>
-<script src="app.js"></script>
-
-
-
-<!-- Edit Row Modal -->
-<dialog id="edit-modal" class="img-modal">
-  <div class="modal-inner">
-    <header class="modal__header">
-      <h3 class="tile-title" id="edit-title">Edit Row</h3>
-      <button type="button" id="edit-close" aria-label="Close">✕</button>
-    </header>
-    <div class="modal__body">
-      <form id="edit-form">
-        <input type="hidden" name="id" id="edit-id">
-        <label>Business Name
-          <input name="Business Name" id="edit-business" required>
-        </label>
-        <label>Site Address
-          <input name="Site Address" id="edit-address">
-        </label>
-        <label>Phone
-          <input name="Phone" id="edit-phone">
-        </label>
-        <label>Notes
-          <textarea name="Notes" id="edit-notes" rows="4"></textarea>
-        </label>
-        <div class="modal__footer" style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;">
-          <button type="button" id="edit-cancel">Cancel</button>
-          <button type="submit" id="edit-save">Save</button>
-        </div>
-      </form>
+  <header class="app-header">
+    <div class="brand">HFD Pre-Plan</div>
+    <div class="actions">
+      <button id="btnAdd" class="btn">Add New</button>
+      <!-- Main-screen Edit intentionally removed -->
     </div>
-  </div>
-</dialog>
+  </header>
 
+  <div class="toolbar">
+    <input id="searchInput" class="search" placeholder="Search by name, address, keywords…" />
+  </div>
+
+  <section class="card">
+    <h2>Pre-Plan Records</h2>
+    <table id="dataTable">
+      <thead id="tableHead"></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div class="pager">
+      <button id="prevPage" class="btn secondary">Prev</button>
+      <span id="pageInfo" class="pageinfo"></span>
+      <button id="nextPage" class="btn secondary">Next</button>
+    </div>
+  </section>
+
+  <dialog id="recordModal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div id="modalThumbWrap" class="modal-thumb"></div>
+      <h3 id="modalTitle">Record</h3>
+      <button id="btnModalEdit" class="btn">Edit</button>
+      <button id="btnCloseModal" class="btn secondary">Close</button>
+    </div>
+    <div id="sectionNav" class="section-nav"></div>
+    <div id="modalContent" class="modal-content"></div>
+  </dialog>
+  <div id="modalBackdrop" class="modal-backdrop" hidden></div>
+
+  <!-- Shim to neutralize any old bundles that still reference main-screen btnEdit -->
+  <script>
+    if (typeof window.btnEdit === 'undefined') { 
+      window.btnEdit = { addEventListener(){}, set disabled(_){}, get disabled(){ return false; } }; 
+    }
+  </script>
+
+  <!-- Cache-busted bundle and popup editor -->
+  <script defer src="app.bundle.js?v=popup-edit"></script>
+  <script defer src="popup-edit.js?v=popup-edit"></script>
 </body>
 </html>

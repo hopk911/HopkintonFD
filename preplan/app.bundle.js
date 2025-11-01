@@ -143,6 +143,16 @@
   const PAGE_SIZE=10; let page=0,rows=[],headers=[],selectedIndex=-1;
 
   function buildHeaders(data){ const s=new Set(); data.forEach(r=>Object.keys(r).forEach(k=>s.add(k))); headers=[...s]; }
+function ensureHeaders(){
+  if (Array.isArray(headers) && headers.length) return headers;
+  const s = new Set();
+  const srcA = (window._allRows && Array.isArray(window._allRows)) ? window._allRows : (Array.isArray(rows)?rows:[]);
+  srcA.forEach(r => Object.keys(r||{}).forEach(k => s.add(k)));
+  headers = Array.from(s);
+  if (!headers.length){ headers = ['Business Name','Address','Closest Hydrant','Knox Box Location','Stable ID']; }
+  return headers;
+}
+
 
   function renderTable(){
     tableHead.innerHTML = '<tr>'+TABLE_COLUMNS.map(c=>'<th>'+c.label+'</th>').join('')+'</tr>';
@@ -179,6 +189,7 @@ openModal();
     const rec=rows[selectedIndex]||{};
     // Expose currently opened record to popup-edit.js
     window._currentRecord = rec;
+  window._isNewDraft = !!(rec && rec.__isNew);
 
     const title = getField(rec,['Business Name','Business Name:','Business','Name','Company']) ||
                   getField(rec,['Address','Address:','Site Address','Street Address']) || 'Record';
@@ -212,12 +223,12 @@ openModal();
         const urls=String(rec[h]||'').split(/[\,\r\n]+|\s{2,}|,\s*/).filter(Boolean);
         for(const u of urls) buckets[sec].photos.push({url:u,sectionId:sec});
       } else {
-        const val=String(rec[h]??''); if(val) buckets[sec].kv.push(renderKV(h,val));
+        const val=String(rec[h]??''); if(val || (window && window._isNewDraft)) buckets[sec].kv.push(renderKV(h,val));
       }
     }
     let html='';
     for(const sc of SECTION_CONFIG){
-      const {kv,photos}=buckets[sc.id]; if(!kv.length && !photos.length) continue;
+      const {kv,photos}=buckets[sc.id]; if(!kv.length && !photos.length && !(window && window._isNewDraft)) continue;
       const label = sc.id==='other' ? title : sc.label;
       html += `<section id="section-${sc.id}" class="section" data-color="${sc.color}">
         <h3>${label}</h3>
@@ -231,13 +242,25 @@ openModal();
     if (modal.showModal) modal.showModal(); else { modal.setAttribute('open',''); backdrop.hidden=false; }
   }
 
-  function closeModal(){ if(modal.close) modal.close(); else { modal.removeAttribute('open'); backdrop.hidden=true; } }
+  function closeModal(){ if(modal.close) modal.close(); else { modal.removeAttribute('open'); backdrop.hidden=true;  discardDraftIfNeeded && discardDraftIfNeeded(); } }
   btnCloseModal.addEventListener('click',closeModal);
   backdrop.addEventListener('click',closeModal);
+  if (modal && modal.addEventListener) modal.addEventListener('close', ()=>{ discardDraftIfNeeded && discardDraftIfNeeded(); });
 
   // Toolbar actions
-  btnAdd.addEventListener('click',()=>{ const blank={}; headers.forEach(h=>blank[h]=''); rows.unshift(blank); selectedIndex=0; openModal(); });
-  btnEdit.addEventListener('click',()=>{ if(selectedIndex>=0) openModal(); });
+  btnAdd.addEventListener('click', ()=>{
+  try{
+    ensureHeaders();
+    const sKey = (typeof findStableKey==='function') ? findStableKey(headers) : 'Stable ID';
+    if (!headers.includes(sKey)) headers.push(sKey);
+    const rec = {}; headers.forEach(h=> rec[h]='');
+    rec[sKey] = (typeof generateStableId==='function') ? generateStableId() : (Date.now().toString(36).toUpperCase());
+    Object.defineProperty(rec,'__isNew',{value:true, enumerable:false, writable:true});
+    Object.defineProperty(rec,'__saved',{value:false, enumerable:false, writable:true});
+    rows.unshift(rec); selectedIndex=0; renderTable && renderTable(); openModal && openModal();
+  }catch(e){ console.error('[addNew] failed to add new record', e); try{ alert('Unable to create a new draft row. See console.'); }catch(_){} }
+});
+btnEdit.addEventListener('click',()=>{ if(selectedIndex>=0) openModal(); });
   prevPage.addEventListener('click',()=>{ if(page>0){ page--; renderTable(); }});
   nextPage.addEventListener('click',()=>{ const total=Math.ceil(rows.length/PAGE_SIZE); if(page<total-1){ page++; renderTable(); }});
 
@@ -254,6 +277,14 @@ openModal();
   // Bootstrap
   (async function init(){
     const data=await loadData(); window._allRows=data; buildHeaders(data); rows=data.slice(); renderTable();
-  })();
+  
+function findStableKey(headersArr){ const CANON='Stable ID'; const hit=(headersArr||[]).find(h=> String(h||'').toLowerCase().replace(/[:\s]+$/,'').trim()==='stable id'); return hit||CANON; }
+function generateStableId(){ const t=new Date(), pad=n=>String(n).padStart(2,'0'); const stamp=`${t.getFullYear()}${pad(t.getMonth()+1)}${pad(t.getDate())}-${pad(t.getHours())}${pad(t.getMinutes())}${pad(t.getSeconds())}`; const rnd=Math.random().toString(36).slice(2,6).toUpperCase(); return `PP-${stamp}-${rnd}`; }
+function discardDraftIfNeeded(){ try{ const rec=rows[selectedIndex]; if(rec && rec.__isNew && !rec.__saved){ rows.splice(selectedIndex,1); selectedIndex=-1; renderTable && renderTable(); } }catch(e){ console.warn('[addNew] discardDraftIfNeeded',e); } }
+})();
 
+
+function findStableKey(headersArr){ const CANON='Stable ID'; const hit=(headersArr||[]).find(h=> String(h||'').toLowerCase().replace(/[:\s]+$/,'').trim()==='stable id'); return hit||CANON; }
+function generateStableId(){ const t=new Date(), pad=n=>String(n).padStart(2,'0'); const stamp=`${t.getFullYear()}${pad(t.getMonth()+1)}${pad(t.getDate())}-${pad(t.getHours())}${pad(t.getMinutes())}${pad(t.getSeconds())}`; const rnd=Math.random().toString(36).slice(2,6).toUpperCase(); return `PP-${stamp}-${rnd}`; }
+function discardDraftIfNeeded(){ try{ const rec=rows[selectedIndex]; if(rec && rec.__isNew && !rec.__saved){ rows.splice(selectedIndex,1); selectedIndex=-1; renderTable && renderTable(); } }catch(e){ console.warn('[addNew] discardDraftIfNeeded',e); } }
 })(); 
