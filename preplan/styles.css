@@ -121,3 +121,24 @@ dialog.modal:not([open]){display:none !important;}
 @media (orientation: landscape) and (min-width: 820px) and (max-height: 900px){
   :root { --modal-top-pad: calc(max(32px, env(safe-area-inset-top) + 16px)); }
 }
+
+
+/* === Robust modal position override (2025-11-01-c) === */
+/* Use a single variable to control top offset across orientations */
+:root { --modal-top-pad: calc(env(safe-area-inset-top) + 48px); } /* portrait default */
+@media (orientation: landscape){
+  :root { --modal-top-pad: calc(env(safe-area-inset-top) + 28px); }
+}
+
+/* Ensure the modal is NOT vertically centered on mobile Safari; only X centered */
+@media (max-width: 1024px){
+  .modal[open]{
+    position: fixed;
+    left: 50%;
+    top: var(--modal-top-pad) !important;
+    transform: translateX(-50%) !important; /* kill any -50% Y translations */
+    max-height: 88svh; /* leave room for chrome */
+    width: min(94vw, 980px);
+    margin: 0;
+  }
+}
