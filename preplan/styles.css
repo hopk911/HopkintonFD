@@ -127,12 +127,12 @@ dialog.modal:not([open]){display:none !important;}
 /* Use a single variable to control top offset across orientations */
 :root { --modal-top-pad: calc(env(safe-area-inset-top) + 48px); } /* portrait default */
 @media (orientation: landscape){
-  :root { --modal-top-pad: calc(env(safe-area-inset-top) + 28px); }
+  :root { --modal-top-pad: calc(env(safe-area-inset-top) + 72px); }
 }
 
 /* Ensure the modal is NOT vertically centered on mobile Safari; only X centered */
-@media (max-width: 1024px){
-  .modal[open]{
+@media (orientation: landscape) and (hover: none) and (pointer: coarse){
+  .modal[open], #recordModal[open]{
     position: fixed;
     left: 50%;
     top: var(--modal-top-pad) !important;
