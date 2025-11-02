@@ -89,8 +89,28 @@ dialog.modal:not([open]){display:none !important;}
 
 
 
-/* --- iPad top clipping fix: ensure modal not cut off --- */
-.modal[open]{
-  top: calc(max(12px, env(safe-area-inset-top)) + 8px) !important;
-}
 
+
+
+/* === Modal mobile tuning (lightweight) === */
+@media (max-width: 900px){
+  dialog.modal[open]{
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    top: calc(env(safe-area-inset-top) + 12px);
+    width: 96vw;
+    max-height: calc(100dvh - env(safe-area-inset-top) - 24px);
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+  }
+  .modal-head{ position: sticky; top: 0; background: var(--card); z-index: 2; }
+  .modal-content{ flex: 1 1 auto; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  .modal-backdrop{ position: fixed; inset: 0; }
+}
+/* Hide closed dialog across browsers */
+dialog.modal:not([open]){ display:none; }
+
+
+.section-nav{ justify-content:center; }
