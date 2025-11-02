@@ -142,3 +142,17 @@ dialog.modal:not([open]){display:none !important;}
     margin: 0;
   }
 }
+
+
+/* Portrait touch override to keep header clear (2025-11-01-d) */
+@media (orientation: portrait) and (hover: none) and (pointer: coarse){
+  .modal[open], #recordModal[open]{
+    position: fixed;
+    left: 50%;
+    top: var(--modal-top-pad) !important;
+    transform: translateX(-50%) !important;
+    max-height: 88svh;
+    width: min(94vw, 980px);
+    margin: 0;
+  }
+}
