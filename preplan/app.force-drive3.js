@@ -9,6 +9,14 @@
     m = s.match(/^([a-zA-Z0-9_-]{25,})$/);          if (m) return m[1];
     return '';
   }
+  
+  function driveProxyUrl(u, w){
+    const webapp=(window.WEBAPP_URL||'').replace(/\/$/,'');
+    if (!webapp) return u;
+    const enc = encodeURIComponent(u);
+    return `${webapp}?fn=img&u=${enc}&w=${w||600}`;
+  }
+
   function driveThumb(id, w){
   const webapp=(window.WEBAPP_URL||'').replace(/\/$/,'');
   if (webapp) return `${webapp}?id=${encodeURIComponent(id)}&w=${w||600}`;
@@ -18,16 +26,16 @@
   function fixUrl(u, w){
     if (!u) return u;
     if (u.includes('lh3.googleusercontent.com/d/')) {
-      const m = u.match(/\/d\/([A-Za-z0-9_-]{10,})/);
-      if (m) return driveThumb(m[1], w);
+      // Route full URL through proxy; avoids DriveApp permission issues
+      return driveProxyUrl(u, w);
     }
     return u;
   }
 
   // Replace all lh3 links in HTML strings
   function rewriteHTML(html, w){
-    return String(html||'').replace(/https?:\/\/lh3\.googleusercontent\.com\/d\/([A-Za-z0-9_-]{10,})[^\s"']*/g,
-      (_, id)=> driveThumb(id, w));
+    return String(html||'').replace(/https?:\/\/lh3\.googleusercontent\.com\/d\/[^\s"']+/g,
+      (full)=> driveProxyUrl(full, w));
   }
 
   // 1) Hard override builder
@@ -115,3 +123,49 @@
   window.loadThumbsWithin = function(){};
   if (window.HFD) window.HFD.observeThumbsWithin = function(){};
 })();
+
+/* === OVERRIDES: robust id->proxy mapping === */
+(function(){
+  if (typeof extractIdFromAny !== 'function') {
+    window.extractIdFromAny = function(input){
+      const s = String(input||'').trim();
+      let m = s.match(/[?&]id=([a-zA-Z0-9_-]{10,})/); if (m) return m[1];
+      m = s.match(/\/d\/([a-zA-Z0-9_-]{10,})/);       if (m) return m[1];
+      m = s.match(/^([a-zA-Z0-9_-]{25,})$/);            if (m) return m[1];
+      return '';
+    };
+  }
+  if (typeof driveProxyUrl !== 'function') {
+    window.driveProxyUrl = function(u, w){
+      const webapp=(window.WEBAPP_URL||'').replace(/\/$/,'');
+      if (!webapp) return u;
+      const enc = encodeURIComponent(u);
+      return `${webapp}?fn=img&u=${enc}&w=${w||600}`;
+    };
+  }
+  window.__fixUrlOverride = function(u, w){
+    if (!u) return u;
+    if (u.includes('lh3.googleusercontent.com/')) return driveProxyUrl(u, w);
+    const id = extractIdFromAny(u);
+    if (id) {
+      const lh3 = `https://lh3.googleusercontent.com/d/${id}=w${w||600}`;
+      return driveProxyUrl(lh3, w);
+    }
+    return u;
+  };
+  // Monkey-patch common attribute setters so all future sets run through override
+  const _setAttr = Element.prototype.setAttribute;
+  Element.prototype.setAttribute = function(name, value){
+    if (name === 'src' || name === 'href') {
+      value = window.__fixUrlOverride(value, 600);
+    }
+    return _setAttr.call(this, name, value);
+  };
+  // Initial sweep
+  document.querySelectorAll('img, a').forEach(el => {
+    const attr = el.tagName === 'A' ? 'href' : 'src';
+    const v = el.getAttribute(attr);
+    if (v) el.setAttribute(attr, v);
+  });
+})();
+

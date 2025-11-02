@@ -111,3 +111,64 @@ dialog.modal:not([open]){display:none !important;}
     max-height: calc(100vh - 190px); /* header (~60-80px) + paddings; adjust if needed */
   }
 }
+
+
+/* === iPad/iOS modal fixes & sticky section nav (reapplied) === */
+
+/* Prevent background scroll when modal is open (body gets class from JS) */
+body.modal-open {
+  position: fixed;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Keep modal header pinned; add safe-area padding */
+@supports (position: sticky) {
+  .modal-head{
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 6px);
+    background: #fff;
+    z-index: 5;
+  }
+}
+
+/* iOS/iPad specific adjustments to avoid top clipping and allow full scroll */
+@supports (-webkit-touch-callout: none) {
+  .modal[open]{
+    /* avoid vertical centering which clips behind the Safari chrome */
+    top: calc(env(safe-area-inset-top, 0px) + 24px) !important;
+    transform: translate(-50%, 0) !important;
+    max-height: calc(100svh - (env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + 48px));
+    width: min(900px, 94vw);
+  }
+  .modal-content{
+    max-height: calc(100svh - 200px); /* header + paddings */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain; /* keep scroll in the popup */
+  }
+}
+
+/* Landscape iPad tune-up */
+@media (min-width: 820px) and (max-width: 1180px) {
+  .modal[open]{
+    top: calc(env(safe-area-inset-top, 0px) + 28px);
+    transform: translate(-50%, 0);
+    max-height: calc(100svh - 96px);
+  }
+  .modal-content{
+    max-height: calc(100svh - 210px);
+  }
+}
+
+/* Center the section navigation, add padding and a bottom rule, keep it sticky inside the modal scroll */
+.modal-content .section-nav{
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 56px);
+  z-index: 4;
+  background: #fff;
+  justify-content: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.modal-content .section-nav .chip { margin: 0 6px; }
+
