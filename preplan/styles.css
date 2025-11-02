@@ -42,7 +42,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .thumb-grid img{width:100%;height:130px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:#f2f2f2}
 
 /* section nav chips */
-.section-nav{display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px 0justify-content:center;padding-bottom:8px;border-bottom:1px solid var(--line);padding-top:8px;}
+.section-nav{display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px 0}
 .section-nav .chip{border:none;border-radius:999px;padding:6px 10px;font-size:13px;color:#fff;cursor:pointer}
 .section-nav .chip[data-color="fire"]{background:var(--c-fire)}
 .section-nav .chip[data-color="ems"]{background:var(--c-ems)}
@@ -73,9 +73,17 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .kv.empty{display:none}
 #recordModal.editing .kv.empty{display:block}
 
+/* Hide dialog when not open (safety across browsers) */
+dialog.modal:not([open]){display:none !important;}
 
-/* Force center the section nav across all contexts */
-.section-nav{ justify-content:center !important; width:100%; }
-.section-nav .chip{ margin:0; }
-.modal .section-nav{ justify-content:center !important; }
+
+/* --- Force center the section navigation --- */
+.section-nav.section-nav,
+.modal .section-nav,
+.section-nav {
+  justify-content: center !important;
+  align-content: center;
+  width: 100%;
+}
+.section-nav .chip { margin: 0; }
 

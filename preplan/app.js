@@ -41,7 +41,6 @@
   }
 // ---- Field routing to sections
   const FIELD_PATTERNS = [
-    [/^\s*Sprinkler\s*(Main\s*)?Shutoff\s*Photo\s*:?\s*$/i,'fire'],
     [/^Remote Alarm Location:?$/i,'fire'],
     [/^Sprinkler Main Shutoff Location:?$/i,'fire'],
     [/^Roof Type:?$/i,'other'],
@@ -280,7 +279,7 @@ function buildImgWithFallback(srcOrId, cls, size) {
     tr.classList.add('selected'); if (btnEdit) { btnEdit.disabled=false; } openModal();
   });
 
-  function openModal(){
+  function openModal(){ if(!(typeof selectedIndex==='number' && selectedIndex>=0)) return; __currentOpenIndex = selectedIndex; if(!(typeof selectedIndex==='number' && selectedIndex>=0)) return;
     const rec=rows[selectedIndex]||{};
     const title = getField(rec,['Business Name','Business Name:','Business','Name','Company']) ||
                   getField(rec,['Address','Address:','Site Address','Street Address']) || 'Record';
@@ -343,7 +342,9 @@ let html='';
   btnCloseModal.addEventListener('click',closeModal);
   backdrop.addEventListener('click',closeModal);
 
-  // Toolbar actions
+  
+  try{ modal.addEventListener('close', ()=>{ __discardDraftIfAny(); }); }catch(_){}
+// Toolbar actions
   btnAdd.addEventListener('click',()=>{ const blank={ __isNew:true }; headers.forEach(h=>blank[h]=''); rows.unshift(blank); selectedIndex=0; openModal(); });
   if (btnEdit) btnEdit.addEventListener('click',()=>{ if(selectedIndex>=0) openModal(); });
   prevPage.addEventListener('click',()=>{ if(page>0){ page--; renderTable(); }});
@@ -382,7 +383,10 @@ let html='';
     }
     if (t.id === 'btnModalClose') {
       e.preventDefault();
-      try { closeModal && closeModal(); } catch (_) {}
+      try { closeModal && closeModal(); }
+  // After any programmatic close, discard draft if present
+  try{ __discardDraftIfAny(); }catch(_){}
+ catch (_) {}
       // Fallback close if no helper:
       const m = document.getElementById('recordModal');
       if (m) { if (typeof m.close === 'function') m.close(); else m.removeAttribute('open'); }
