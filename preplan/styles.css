@@ -111,28 +111,3 @@ dialog.modal:not([open]){display:none !important;}
     max-height: calc(100vh - 190px); /* header (~60-80px) + paddings; adjust if needed */
   }
 }
-
-
-/* === Mobile-safe modal fixes (2025-11-01) === */
-/* Make dialog a flex column; keep header visible and only content scrolls */
-.modal{display:flex;flex-direction:column;max-height:92svh}
-.modal-head{position:sticky;top:0;background:#fff;z-index:2}
-.modal-content{flex:1;min-height:0;overflow:auto}
-
-/* Lock background scroll when modal is open */
-body.modal-open{overflow:hidden}
-
-/* Better iOS/Android positioning when <dialog> fallback is used */
-@supports not (anchor-name: --dummy) {
-  .modal[open]{max-height:92svh}
-  @media (max-width: 900px){
-    .modal[open]{
-      top:calc(max(12px, env(safe-area-inset-top)));
-      transform:translateX(-50%); /* no vertical centering on phones */
-      width:92vw
-    }
-  }
-}
-
-/* Ensure section chips wrap nicely on narrow screens */
-.section-nav{row-gap:8px}

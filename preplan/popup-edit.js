@@ -104,9 +104,14 @@ const FIELD_SELECTS = {
           vEl.removeAttribute('contenteditable');
           const sel = document.createElement('select');
           sel.setAttribute('data-editor', normKeyLower);
-          opts.forEach(opt => { const o=document.createElement('option'); o.value=opt; o.textContent=opt; sel.appendChild(o); });
-          if (current) sel.value = current;
-          vEl.textContent = '';
+          
+    // Insert a blank first
+    (function(){ const o=document.createElement('option'); o.value=''; o.textContent=''; sel.appendChild(o); })();
+    opts.forEach(opt => { const o=document.createElement('option'); o.value=opt; o.textContent=opt; sel.appendChild(o); });
+    sel.setAttribute('data-current', current);
+    // Preselect exact match if present, otherwise keep blank
+    if (current && Array.from(sel.options).some(o=>o.value===current)) sel.value = current; else sel.value='';
+    vEl.textContent = '';
           vEl.appendChild(sel);
         } else {
           vEl.setAttribute('contenteditable','true');

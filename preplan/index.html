@@ -50,7 +50,7 @@
   </div>
 
   <section class="card">
-    <h2>Pre-Plan Records</h2>
+    
     <table id="dataTable">
       <thead id="tableHead"></thead>
       <tbody id="tableBody"></tbody>
@@ -138,23 +138,5 @@ var modal = document.getElementById('recordModal');
   }catch(e){}
 })();
 </script>
-
-<script>
-// Toggle background scroll lock while modal is open
-(function(){
-  var modal = document.getElementById('recordModal');
-  if(!modal) return;
-  function sync(){ document.body.classList.toggle('modal-open', modal.hasAttribute('open')); }
-  // Observe attribute changes (covers programmatic open/close)
-  var obs = new MutationObserver(sync);
-  obs.observe(modal, { attributes:true, attributeFilter:['open'] });
-  // Also hook buttons if present
-  document.addEventListener('click', function(e){
-    if(e.target && (e.target.id==='btnCloseModal')){ setTimeout(sync, 0); }
-  }, true);
-  sync();
-})();
-</script>
-
 </body>
 </html>
