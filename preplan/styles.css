@@ -197,3 +197,9 @@ dialog.modal:not([open]){display:none !important;}
   padding-top: 16px !important;
   padding-bottom: 16px !important;
 }
+
+
+/* === Add bottom border line to section navigation (2025-11-01) === */
+.section-nav, .modal-content .section-nav {
+  border-bottom: 1px solid var(--line, #ccc);
+}
