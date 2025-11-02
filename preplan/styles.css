@@ -169,3 +169,18 @@ dialog.modal:not([open]){display:none !important;}
   margin-bottom: 8px;
   box-shadow: 0 1px 0 0 var(--line); /* subtle divider */
 }
+
+
+/* === Keep nav visible when jumping to sections (2025-11-01) === */
+:root {
+  --modal-sticky-offset: calc(env(safe-area-inset-top, 0px) + 120px);
+}
+@media (orientation: landscape){
+  :root {
+    --modal-sticky-offset: calc(env(safe-area-inset-top, 0px) + 140px);
+  }
+}
+/* Ensure anchors stop below the sticky header + nav */
+.modal-content [id^="section-"]{
+  scroll-margin-top: var(--modal-sticky-offset);
+}
