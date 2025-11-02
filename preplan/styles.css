@@ -138,3 +138,27 @@ a[href="#"][style*="position:fixed"][style*="right:8px"][style*="bottom:8px"]{ d
   .modal-content{ flex: 1 1 auto; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 }
 
+
+
+/* === iPad/Safari landscape modal fix === */
+@media (orientation: landscape){
+  dialog.modal[open]{
+    top: calc(env(safe-area-inset-top) + 2px) !important;
+    /* Use CSS var --vh to avoid Safari toolbar height issues */
+    max-height: calc((var(--vh, 1vh) * 100) - env(safe-area-inset-top) - 8px) !important;
+  }
+}
+
+/* Prefer small viewport units on iOS Safari when supported */
+@supports (-webkit-touch-callout: none){
+  dialog.modal[open]{
+    max-height: calc(100svh - env(safe-area-inset-top) - 8px);
+  }
+}
+
+
+
+@media (max-width: 1024px){
+  dialog.modal[open]{ max-height: calc((var(--vh, 1vh) * 100) - env(safe-area-inset-top) - 16px) !important; }
+}
+
