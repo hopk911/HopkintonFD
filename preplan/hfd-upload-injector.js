@@ -15,7 +15,7 @@
   const PHOTO_UPLOAD_FOLDERS = {
     'Photo:':                    '1AZWEVmdqmuUZceORmi24ULowcuPURGvWwIB4rJKklGkaIx8M_5jl789mHLLwQoCvtLOWrQHj',
     'Roof Access Photo:':               '1tB3H1OAgBW5cmMugNFKbJPpK80FaDa7ZQ36xCSamawFFefRMsZ1cLlPRSmnll6BSLu62c5S0',
-    'Alarm Photo':              '1UWb5MlIFy6QqgKn5ST3F5XW9hgl_MtzE4aJzomb7l0iS3c9jbA_fg4_kq7KZ_Pt7GrLLnp3c',
+    'Alarm Photo:':              '1UWb5MlIFy6QqgKn5ST3F5XW9hgl_MtzE4aJzomb7l0iS3c9jbA_fg4_kq7KZ_Pt7GrLLnp3c',
     'Elevator Shutoff Photo:':   '1H_VrGy1fkWPK38BJSCgjqNrP3W3G0jcLLLTDfGpJno2KihA3Lzb8G6fXqjfgwvcAmK8gLoM-',
     'Gas Shutoff Photo:':        '1bgG9RNthY7FsAhGAddu3OKCRL5NU4-HS2iS_n6YOPoX-X4Pdr-J9RFYQWAiCPbFgvsBuyQMG',
     'Electrical Shutoff Photo:': '1dcc6X2iAoykCd5zLztJsW6PmYUn18W6Pu6g83ATyWD7ej7oSTg-Wi2-HJEluwwEqaitz8pSg',

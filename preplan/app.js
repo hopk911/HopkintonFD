@@ -41,6 +41,7 @@
   }
 // ---- Field routing to sections
   const FIELD_PATTERNS = [
+    [/^\s*Sprinkler\s*(Main\s*)?Shutoff\s*Photo\s*:?\s*$/i,'fire'],
     [/^Remote Alarm Location:?$/i,'fire'],
     [/^Sprinkler Main Shutoff Location:?$/i,'fire'],
     [/^Roof Type:?$/i,'other'],
@@ -305,22 +306,22 @@ function buildImgWithFallback(srcOrId, cls, size) {
     });
 
     // Build sections
-    const buckets={}; SECTION_CONFIG.forEach(sc=>buckets[sc.id]={kv:[],photos:[]});
-    for(const h of headers){
-  if(shouldHideInModal(h)) continue;
+    
+const buckets={}; SECTION_CONFIG.forEach(sc=>buckets[sc.id]={kv:[],photos:[]});
+for (const h of headers){
   const sec = sectionForField(h);
-  if(isPhotoHeader(h)){
+  if (isPhotoHeader(h)){
     const urls = String(rec[h]||'').split(/[\,\r\n]+|\s{2,}|,\s*/).filter(Boolean);
-    for(const u of urls) buckets[sec].photos.push({url:u, sectionId:sec});
-    // NEW: For new drafts with no photo yet, ensure the section renders so upload buttons can mount
-    if ((!urls.length) && window._isNewDraft) { buckets[sec].kv.push(renderKV(h, '')); }
-  } else {
-    const val = String(rec[h]??'');
-    if (val) buckets[sec].kv.push(renderKV(h, val));
-    else if (window._isNewDraft) buckets[sec].kv.push(renderKV(h, ''));
+    for (const u of urls){ buckets[sec].photos.push({url:u, sectionId:sec}); }
+    // no KV row for photo fields (they're hidden), but previews should still render
+    continue;
   }
+  // Non-photo fields: respect hide rule
+  if (shouldHideInModal(h)) continue;
+  const val = rec[h]==null ? '' : String(rec[h]);
+  buckets[sec].kv.push(renderKV(h, val));
 }
-    let html='';
+let html='';
     for(const sc of SECTION_CONFIG){
   const {kv,photos} = buckets[sc.id];
   if (!window._isNewDraft && !kv.length && !photos.length) continue;

@@ -22,16 +22,8 @@
       if (looksTruncated(window.WEBAPP_URL)) window.WEBAPP_URL = stored || window.WEBAPP_URL;
       if (looksTruncated(window.WEBAPP_URL)) {
         console.error('[config] WEBAPP_URL is missing/invalid. Set it via ?webapp=<url> or localStorage.WEBAPP_URL.');
-      } else {
-        console.log('[config] WEBAPP_URL:', window.WEBAPP_URL);
-      }
-      window.addEventListener('DOMContentLoaded', ()=>{
-        const a=document.createElement('a');
-        a.href='#'; a.textContent='Config'; a.style.cssText='position:fixed;right:8px;bottom:8px;font:12px/1.2 system-ui;opacity:.4';
-        a.onclick=(e)=>{e.preventDefault();console.log('[config] WEBAPP_URL:', window.WEBAPP_URL)};
-        document.body.appendChild(a);
-      });
-    })();
+      } 
+      })();
 
     window.__BUILD__ = "popup-edit-2025-10-30T21:03:17";
   </script>
@@ -91,7 +83,6 @@
   <!-- Cache-busted bundle and popup editor -->
 <script src="app.bundle.js"></script>
 <script src="app.js"></script>
-\1
 
 
 <script src="popup-edit.js"></script>

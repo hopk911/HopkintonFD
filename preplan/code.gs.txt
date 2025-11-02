@@ -205,6 +205,26 @@ function handleSave_(ctx) {
 
 /* ---------- Sheet helpers ---------- */
 
+
+/** Canonicalize a payload key to an existing sheet header.
+ * Returns '' if no match is found (caller should skip that key).
+ */
+function canonHeaderKey_(key, indexByName) {
+  var k = String(key || '').trim();
+  if (!k) return '';
+  // exact match
+  if (indexByName[k]) return k;
+
+  // try with/without trailing colon variants
+  var noColon = k.replace(/:\s*$/, '');
+  if (indexByName[noColon]) return noColon;
+  if (indexByName[noColon + ':']) return (noColon + ':');
+  if (indexByName[k + ':']) return (k + ':');
+
+  // no match in the current header map => skip this key
+  return '';
+}
+
 function upsertRow_(obj) {
   if (!SPREADSHEET_ID) throw new Error('SPREADSHEET_ID not set');
   if (!SHEET_NAME) throw new Error('SHEET_NAME not set');
