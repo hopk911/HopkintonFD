@@ -111,3 +111,11 @@ dialog.modal:not([open]){display:none !important;}
     max-height: calc(100vh - 190px); /* header (~60-80px) + paddings; adjust if needed */
   }
 }
+
+
+/* === iPad landscape extra top padding (2025-11-01) === */
+@media (orientation: landscape) and (max-height: 820px){
+  .modal[open]{
+    top: calc(max(36px, env(safe-area-inset-top) + 20px));
+  }
+}
