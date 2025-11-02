@@ -190,3 +190,10 @@ dialog.modal:not([open]){display:none !important;}
 .section-nav, .modal-content .section-nav {
   padding-bottom: 16px !important;
 }
+
+
+/* === Add top and bottom padding to section navigation (2025-11-01) === */
+.section-nav, .modal-content .section-nav {
+  padding-top: 16px !important;
+  padding-bottom: 16px !important;
+}
