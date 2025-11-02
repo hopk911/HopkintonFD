@@ -138,5 +138,48 @@ var modal = document.getElementById('recordModal');
   }catch(e){}
 })();
 </script>
+
+<script>
+// Ensure nav stays visible when jumping: override chip clicks to scroll container with offset
+(function(){
+  const modal = document.getElementById('recordModal');
+  const content = document.getElementById('modalContent');
+  const nav = document.getElementById('sectionNav');
+  if(!modal || !content || !nav) return;
+
+  function getStickyOffset(){
+    const head = modal.querySelector('.modal-head');
+    const headH = head ? head.offsetHeight : 0;
+    const navH = nav ? nav.offsetHeight : 0;
+    // Small extra buffer to clear borders/safe area
+    const buffer = 8;
+    return headH + navH + buffer;
+  }
+
+  function scrollToSection(id){
+    const el = document.getElementById('section-' + id);
+    if(!el) return;
+    // Compute target relative to the scroll container
+    const containerTop = content.getBoundingClientRect().top;
+    const elTop = el.getBoundingClientRect().top;
+    const current = content.scrollTop;
+    const delta = elTop - containerTop;
+    const target = Math.max(0, current + delta - getStickyOffset());
+    content.scrollTo({ top: target, behavior: 'smooth' });
+  }
+
+  // Capture-phase listener to preempt existing chip handlers (which use scrollIntoView)
+  nav.addEventListener('click', function(e){
+    const chip = e.target.closest && e.target.closest('.chip');
+    if(!chip) return;
+    const id = chip.getAttribute('data-target');
+    if(!id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    scrollToSection(id);
+  }, true);
+})();
+</script>
+
 </body>
 </html>
