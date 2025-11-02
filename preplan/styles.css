@@ -19,7 +19,7 @@ thead th,tbody td{padding:10px;border-bottom:1px solid var(--line);text-align:le
 
 /* modal + fallback */
 .modal{width:min(900px,92vw);border:none;border-radius:16px;padding:0;background:#fff}
-.modal[open]{display:block}
+.modal[open]{top: var(--modal-top-pad);display:block}
 dialog::backdrop{background:rgba(0,0,0,.35)}
 @supports not (anchor-name: --dummy) {
   .modal[open]{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1001;box-shadow:0 10px 30px rgba(0,0,0,.25)}
@@ -113,9 +113,11 @@ dialog.modal:not([open]){display:none !important;}
 }
 
 
-/* === iPad landscape extra top padding (2025-11-01) === */
-@media (orientation: landscape) and (max-height: 820px){
-  .modal[open]{
-    top: calc(max(36px, env(safe-area-inset-top) + 20px));
-  }
+
+
+
+/* === Modal top padding control (2025-11-01-b) === */
+:root { --modal-top-pad: calc(max(12px, env(safe-area-inset-top))); }
+@media (orientation: landscape) and (min-width: 820px) and (max-height: 900px){
+  :root { --modal-top-pad: calc(max(32px, env(safe-area-inset-top) + 16px)); }
 }
