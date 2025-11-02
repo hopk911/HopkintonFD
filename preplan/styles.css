@@ -88,77 +88,26 @@ dialog.modal:not([open]){display:none !important;}
 .section-nav .chip { margin: 0; }
 
 
+/* Sticky modal header with iOS safe-area and smaller offset */
+@supports (position: sticky) {
+  .modal-head{
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 4px);
+    background: #fff;
+    z-index: 5;
+  }
+}
 
+/* iOS momentum scrolling for modal body; keep header fixed */
+.modal-content{
+  -webkit-overflow-scrolling: touch;
+}
 
-
-
-/* === Modal mobile tuning (lightweight) === */
+/* Mobile viewport sizing: prefer 100vh to avoid Safari 100dvh quirks */
 @media (max-width: 900px){
-  dialog.modal[open]{
-    position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
-    top: calc(env(safe-area-inset-top) + 12px);
-    width: 96vw;
-    max-height: calc(100dvh - env(safe-area-inset-top) - 24px);
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-  }
-  .modal-head{ position: sticky; top: 0; background: var(--card); z-index: 2; }
-  .modal-content{ flex: 1 1 auto; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
-  .modal-backdrop{ position: fixed; inset: 0; }
-}
-/* Hide closed dialog across browsers */
-dialog.modal:not([open]){ display:none; }
-
-
-.section-nav{ justify-content:center; }
-
-/* Hide legacy debug Config link */
-a[href="#"][style*="position:fixed"][style*="right:8px"][style*="bottom:8px"]{ display:none !important; }
-
-
-/* === iPad/Safari modal position fix === */
-@media (max-width: 1024px){
-  dialog.modal[open]{
-    position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
-    /* Smaller top offset; avoid dvh quirks on iPad */
-    top: calc(env(safe-area-inset-top) + 4px) !important;
-    width: min(96vw, 900px);
-    /* Use 100vh instead of 100dvh on iPad */
-    max-height: calc(100vh - env(safe-area-inset-top) - 16px) !important;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-  }
-  .modal-head{ position: sticky; top: 0; background: var(--card); z-index: 2; }
-  .modal-content{ flex: 1 1 auto; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
-}
-
-
-
-/* === iPad/Safari landscape modal fix === */
-@media (orientation: landscape){
-  dialog.modal[open]{
-    top: calc(env(safe-area-inset-top) + 2px) !important;
-    /* Use CSS var --vh to avoid Safari toolbar height issues */
-    max-height: calc((var(--vh, 1vh) * 100) - env(safe-area-inset-top) - 8px) !important;
+  html, body { height: 100vh; }
+  /* Make content area size relative to viewport, accounting for header + paddings */
+  .modal-content{
+    max-height: calc(100vh - 190px); /* header (~60-80px) + paddings; adjust if needed */
   }
 }
-
-/* Prefer small viewport units on iOS Safari when supported */
-@supports (-webkit-touch-callout: none){
-  dialog.modal[open]{
-    max-height: calc(100svh - env(safe-area-inset-top) - 8px);
-  }
-}
-
-
-
-@media (max-width: 1024px){
-  dialog.modal[open]{ max-height: calc((var(--vh, 1vh) * 100) - env(safe-area-inset-top) - 16px) !important; }
-}
-

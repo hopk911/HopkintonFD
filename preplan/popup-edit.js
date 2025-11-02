@@ -236,3 +236,32 @@ function collectFromPopup(){
   const observer = new MutationObserver(() => { if (__editObserverGuard) return; if (editing) setEditable(false); });
   observer.observe(content, { childList: true });
 })();
+
+/* --- Post-process selects to keep blank defaults on empty values --- */
+(function(){
+  try{
+    const content = document.getElementById('modalContent');
+    if(!content) return;
+    const ensureBlank = (root)=>{
+      root.querySelectorAll('select[data-editor]').forEach(sel=>{
+        // Ensure a leading blank option exists
+        const hasBlank = [...sel.options].some(o => o.value === '');
+        if(!hasBlank){
+          const blank = document.createElement('option');
+          blank.value = '';
+          blank.textContent = '';
+          sel.insertBefore(blank, sel.firstChild);
+        }
+        // If current field is empty/falsy, keep it blank
+        const textValue = sel.getAttribute('data-current') || '';
+        if(!textValue || textValue === '-' || textValue === '—' || textValue === 'N/A'){
+          sel.value = '';
+        }
+      });
+    };
+    // Run on open and whenever content mutates (entering edit mode)
+    ensureBlank(content);
+    const mo = new MutationObserver(muts => muts.forEach(m => ensureBlank(content)));
+    mo.observe(content, {childList:true, subtree:true});
+  }catch(e){ console.warn('select blank-default patch failed', e); }
+})();
