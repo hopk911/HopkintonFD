@@ -156,3 +156,16 @@ dialog.modal:not([open]){display:none !important;}
     margin: 0;
   }
 }
+
+
+/* === Sticky section navigation inside modal (2025-11-01) === */
+.modal-content .section-nav,
+.section-nav.sticky{
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 56px); /* sits under sticky .modal-head */
+  background: #fff;
+  z-index: 4;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 0 0 var(--line); /* subtle divider */
+}
