@@ -23,13 +23,7 @@
       if (looksTruncated(window.WEBAPP_URL)) {
         console.error('[config] WEBAPP_URL is missing/invalid. Set it via ?webapp=<url> or localStorage.WEBAPP_URL.');
       } 
-      window.addEventListener('DOMContentLoaded', ()=>{
-        const a=document.createElement('a');
-        a.href='#'; a.textContent='Config'; a.style.cssText='position:fixed;right:8px;bottom:8px;font:12px/1.2 system-ui;opacity:.4';
-        a.onclick=(e)=>{e.preventDefault();console.log('[config] WEBAPP_URL:', window.WEBAPP_URL)};
-        document.body.appendChild(a);
-      });
-    })();
+      })();
 
     window.__BUILD__ = "popup-edit-2025-10-30T21:03:17";
   </script>
@@ -40,6 +34,34 @@
     .modal .kv.locked .v{ pointer-events:none; opacity:.8; }
     .modal .kv.locked .k::after{ content:" (locked)"; font-weight:400; opacity:.7; }
   </style>
+
+<script>
+  // Guard: remove any stray "Config" anchors that mimic the old debug link
+  (function(){
+    function nukeConfigAnchors(){
+      try{
+        document.querySelectorAll('a').forEach(a=>{
+          const txt = (a.textContent||'').trim().toLowerCase();
+          const st  = (a.getAttribute('style')||'').toLowerCase();
+          if (txt === 'config' && /position\s*:\s*fixed/.test(st) && /right\s*:\s*8px/.test(st) && /bottom\s*:\s*8px/.test(st)){
+            a.remove();
+          }
+        });
+      }catch(_){}
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', nukeConfigAnchors, { once:true });
+    } else {
+      nukeConfigAnchors();
+    }
+    // Also watch for future nodes
+    try{
+      const mo = new MutationObserver(nukeConfigAnchors);
+      mo.observe(document.documentElement, { childList:true, subtree:true });
+    }catch(_){}
+  })();
+</script>
+
 </head>
 <body>
   <header class="app-header">

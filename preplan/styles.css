@@ -114,3 +114,27 @@ dialog.modal:not([open]){ display:none; }
 
 
 .section-nav{ justify-content:center; }
+
+/* Hide legacy debug Config link */
+a[href="#"][style*="position:fixed"][style*="right:8px"][style*="bottom:8px"]{ display:none !important; }
+
+
+/* === iPad/Safari modal position fix === */
+@media (max-width: 1024px){
+  dialog.modal[open]{
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    /* Smaller top offset; avoid dvh quirks on iPad */
+    top: calc(env(safe-area-inset-top) + 4px) !important;
+    width: min(96vw, 900px);
+    /* Use 100vh instead of 100dvh on iPad */
+    max-height: calc(100vh - env(safe-area-inset-top) - 16px) !important;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-head{ position: sticky; top: 0; background: var(--card); z-index: 2; }
+  .modal-content{ flex: 1 1 auto; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+}
+
