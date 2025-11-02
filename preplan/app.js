@@ -1,3 +1,13 @@
+// === Hard shims for globals used by bundle (load-first) ===
+if (typeof __currentOpenIndex === 'undefined') { var __currentOpenIndex = -1; }
+if (typeof __discardDraftIfAny === 'undefined') { var __discardDraftIfAny = function(){}; }
+// Also mirror to window for any window-based checks
+if (typeof window !== 'undefined') {
+  if (typeof window.__currentOpenIndex === 'undefined') window.__currentOpenIndex = __currentOpenIndex;
+  if (typeof window.__discardDraftIfAny === 'undefined') window.__discardDraftIfAny = __discardDraftIfAny;
+}
+// === end shims ===
+
 (function(){
   'use strict';
 
@@ -281,6 +291,8 @@ function buildImgWithFallback(srcOrId, cls, size) {
 
   function openModal(){ if(!(typeof selectedIndex==='number' && selectedIndex>=0)) return; __currentOpenIndex = selectedIndex; if(!(typeof selectedIndex==='number' && selectedIndex>=0)) return;
     const rec=rows[selectedIndex]||{};
+window._currentRecord = rec;
+window._isNewDraft = !!(rec && rec.__isNew);
     const title = getField(rec,['Business Name','Business Name:','Business','Name','Company']) ||
                   getField(rec,['Address','Address:','Site Address','Street Address']) || 'Record';
     modalTitle.textContent = title;
@@ -383,13 +395,26 @@ let html='';
     }
     if (t.id === 'btnModalClose') {
       e.preventDefault();
-      try { closeModal && closeModal(); }
-  // After any programmatic close, discard draft if present
-  try{ __discardDraftIfAny(); }catch(_){}
- catch (_) {}
+      try { if (typeof closeModal === 'function') closeModal(); } catch (_) {}
+      // After any programmatic close, discard draft if present
+      try { if (typeof __discardDraftIfAny === 'function') __discardDraftIfAny(); } catch (_) {}
       // Fallback close if no helper:
       const m = document.getElementById('recordModal');
-      if (m) { if (typeof m.close === 'function') m.close(); else m.removeAttribute('open'); }
+      if (m) {
+        if (typeof m.close === 'function') {
+          m.close();
+        } else {
+          m.removeAttribute('open');
+          try { m.dispatchEvent(new Event('close')); } catch(_) {}
+          // If this was a new, unsaved draft, force a soft refresh
+          try {
+            if (window._isNewDraft === true) {
+              window._isNewDraft = false;
+              setTimeout(()=>location.reload(), 0);
+            }
+          } catch(_) {}
+        }
+      }
     }
   });
 })();

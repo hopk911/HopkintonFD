@@ -19,7 +19,7 @@ thead th,tbody td{padding:10px;border-bottom:1px solid var(--line);text-align:le
 
 /* modal + fallback */
 .modal{width:min(900px,92vw);border:none;border-radius:16px;padding:0;background:#fff}
-.modal[open]{top: var(--modal-top-pad);display:block}
+.modal[open]{display:block}
 dialog::backdrop{background:rgba(0,0,0,.35)}
 @supports not (anchor-name: --dummy) {
   .modal[open]{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1001;box-shadow:0 10px 30px rgba(0,0,0,.25)}
@@ -110,96 +110,4 @@ dialog.modal:not([open]){display:none !important;}
   .modal-content{
     max-height: calc(100vh - 190px); /* header (~60-80px) + paddings; adjust if needed */
   }
-}
-
-
-
-
-
-/* === Modal top padding control (2025-11-01-b) === */
-:root { --modal-top-pad: calc(max(12px, env(safe-area-inset-top))); }
-@media (orientation: landscape) and (min-width: 820px) and (max-height: 900px){
-  :root { --modal-top-pad: calc(max(32px, env(safe-area-inset-top) + 16px)); }
-}
-
-
-/* === Robust modal position override (2025-11-01-c) === */
-/* Use a single variable to control top offset across orientations */
-:root { --modal-top-pad: calc(env(safe-area-inset-top) + 48px); } /* portrait default */
-@media (orientation: landscape){
-  :root { --modal-top-pad: calc(env(safe-area-inset-top) + 72px); }
-}
-
-/* Ensure the modal is NOT vertically centered on mobile Safari; only X centered */
-@media (orientation: landscape) and (hover: none) and (pointer: coarse){
-  .modal[open], #recordModal[open]{
-    position: fixed;
-    left: 50%;
-    top: var(--modal-top-pad) !important;
-    transform: translateX(-50%) !important; /* kill any -50% Y translations */
-    max-height: 88svh; /* leave room for chrome */
-    width: min(94vw, 980px);
-    margin: 0;
-  }
-}
-
-
-/* Portrait touch override to keep header clear (2025-11-01-d) */
-@media (orientation: portrait) and (hover: none) and (pointer: coarse){
-  .modal[open], #recordModal[open]{
-    position: fixed;
-    left: 50%;
-    top: var(--modal-top-pad) !important;
-    transform: translateX(-50%) !important;
-    max-height: 88svh;
-    width: min(94vw, 980px);
-    margin: 0;
-  }
-}
-
-
-/* === Sticky section navigation inside modal (2025-11-01) === */
-.modal-content .section-nav,
-.section-nav.sticky{
-  position: sticky;
-  top: calc(env(safe-area-inset-top, 0px) + 56px); /* sits under sticky .modal-head */
-  background: #fff;
-  z-index: 4;
-  padding-bottom: 8px;
-  margin-bottom: 8px;
-  box-shadow: 0 1px 0 0 var(--line); /* subtle divider */
-}
-
-
-/* === Keep nav visible when jumping to sections (2025-11-01) === */
-:root {
-  --modal-sticky-offset: calc(env(safe-area-inset-top, 0px) + 120px);
-}
-@media (orientation: landscape){
-  :root {
-    --modal-sticky-offset: calc(env(safe-area-inset-top, 0px) + 140px);
-  }
-}
-/* Ensure anchors stop below the sticky header + nav */
-.modal-content [id^="section-"]{
-  scroll-margin-top: var(--modal-sticky-offset);
-}
-
-
-/* === Add bottom padding to section navigation (2025-11-01) === */
-.section-nav, .modal-content .section-nav {
-  padding-bottom: 16px !important;
-}
-
-
-/* === Add top and bottom padding to section navigation (2025-11-01) === */
-.section-nav, .modal-content .section-nav {
-  padding-top: 16px !important;
-  padding-bottom: 16px !important;
-}
-
-
-/* === Add bottom border line to section navigation (2025-11-01) === */
-.section-nav, .modal-content .section-nav {
-  border-bottom: 1px solid var(--line, #ccc);
 }

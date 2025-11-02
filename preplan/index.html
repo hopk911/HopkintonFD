@@ -6,7 +6,9 @@
   <title>HFD Pre-Plan</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" href="data:," />
-  <script>
+  
+  <script src="app.force-drive3.js"></script>
+<script>
     // Runtime config
     window.WEBAPP_URL = window.WEBAPP_URL || "https://script.google.com/macros/s/AKfycbykO4efgUPVB_tMlkzT1ZDfahXbMnURnGGFTDZYqn8R4XkEEzCg72kjiPqkGsiegHP_Jg/exec";
     window.GOOGLE_SHEET_JSON_URL = window.GOOGLE_SHEET_JSON_URL || "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnI5i_UglY6cveM2wxO9R9lOCgNKB44V4wsROjujIg4SVw9oHCrLShe8WsrTUErebWIwp7mwtaNHq9/pub?output=csv";
@@ -50,7 +52,7 @@
   </div>
 
   <section class="card">
-    
+    <h2>Pre-Plan Records</h2>
     <table id="dataTable">
       <thead id="tableHead"></thead>
       <tbody id="tableBody"></tbody>
@@ -140,44 +142,33 @@ var modal = document.getElementById('recordModal');
 </script>
 
 <script>
-// Ensure nav stays visible when jumping: override chip clicks to scroll container with offset
+// Force table refresh if a new draft was opened and then closed without saving
 (function(){
-  const modal = document.getElementById('recordModal');
-  const content = document.getElementById('modalContent');
-  const nav = document.getElementById('sectionNav');
-  if(!modal || !content || !nav) return;
+  var modal = document.getElementById('recordModal');
+  var search = document.getElementById('searchInput');
+  if (!modal || !search) return;
 
-  function getStickyOffset(){
-    const head = modal.querySelector('.modal-head');
-    const headH = head ? head.offsetHeight : 0;
-    const navH = nav ? nav.offsetHeight : 0;
-    // Small extra buffer to clear borders/safe area
-    const buffer = 8;
-    return headH + navH + buffer;
+  function refreshTableViaSearch(){
+    try {
+      // Toggle a space to trigger the debounced onSearch in the bundle
+      var v = search.value || '';
+      search.value = v + ' ';
+      search.dispatchEvent(new Event('input', {bubbles:true}));
+      setTimeout(function(){
+        search.value = v.trim();
+        search.dispatchEvent(new Event('input', {bubbles:true}));
+      }, 10);
+    } catch(e){ /* no-op */ }
   }
 
-  function scrollToSection(id){
-    const el = document.getElementById('section-' + id);
-    if(!el) return;
-    // Compute target relative to the scroll container
-    const containerTop = content.getBoundingClientRect().top;
-    const elTop = el.getBoundingClientRect().top;
-    const current = content.scrollTop;
-    const delta = elTop - containerTop;
-    const target = Math.max(0, current + delta - getStickyOffset());
-    content.scrollTo({ top: target, behavior: 'smooth' });
-  }
-
-  // Capture-phase listener to preempt existing chip handlers (which use scrollIntoView)
-  nav.addEventListener('click', function(e){
-    const chip = e.target.closest && e.target.closest('.chip');
-    if(!chip) return;
-    const id = chip.getAttribute('data-target');
-    if(!id) return;
-    e.preventDefault();
-    e.stopPropagation();
-    scrollToSection(id);
-  }, true);
+  modal.addEventListener('close', function(){
+    try {
+      if (window._isNewDraft === true) {
+        window._isNewDraft = false;
+        refreshTableViaSearch();
+      }
+    } catch(_) {}
+  });
 })();
 </script>
 

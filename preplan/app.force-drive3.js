@@ -9,7 +9,11 @@
     m = s.match(/^([a-zA-Z0-9_-]{25,})$/);          if (m) return m[1];
     return '';
   }
-  function driveThumb(id, w){ return `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w||600}`; }
+  function driveThumb(id, w){
+  const webapp=(window.WEBAPP_URL||'').replace(/\/$/,'');
+  if (webapp) return `${webapp}?id=${encodeURIComponent(id)}&w=${w||600}`;
+  return `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w||600}`;
+}
 
   function fixUrl(u, w){
     if (!u) return u;

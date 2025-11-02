@@ -2,6 +2,32 @@
 (function () {
   'use strict';
 
+// Resolve a value from the current record by trying key variants
+function __resolveValueFromRecord(keyBase){
+  try{
+    const rec = (window._currentRecord && typeof window._currentRecord==='object') ? window._currentRecord : null;
+    if(!rec) return null;
+    const variants = [
+      keyBase,
+      keyBase + ':',
+      keyBase.replace(/\s+/g,' ').trim(),
+      keyBase.replace(/\s+/g,' ').trim() + ':',
+      keyBase.replace(/:$/,'').trim(),
+      keyBase.replace(/:$/,'').trim() + ':'
+    ];
+    for (const v of variants){
+      if (v in rec) return (rec[v] ?? '');
+    }
+    // Also try case-insensitive lookup
+    const low = keyBase.toLowerCase().replace(/:$/,'');
+    for (const k of Object.keys(rec)){
+      if (String(k).toLowerCase().replace(/:$/,'') === low) return (rec[k] ?? '');
+    }
+    return null;
+  }catch(_){ return null; }
+}
+
+
   // ---- DOM hooks (match index.html) ----
   const modal   = document.getElementById('recordModal');
   const content = document.getElementById('modalContent');
@@ -100,18 +126,35 @@ const FIELD_SELECTS = {
         // If this field has a select defined, render select; else use contenteditable
         const opts = FIELD_SELECTS[normKeyLower];
         if (opts && !vEl.querySelector('select[data-editor]')){
-          const current = (vEl.innerText||'').trim();
+          let current = (vEl.innerText||'').trim();
+          const recVal = __resolveValueFromRecord(normKey);
+          if (recVal != null && String(recVal).trim() !== '') current = String(recVal).trim();
           vEl.removeAttribute('contenteditable');
           const sel = document.createElement('select');
           sel.setAttribute('data-editor', normKeyLower);
-          
-    // Insert a blank first
-    (function(){ const o=document.createElement('option'); o.value=''; o.textContent=''; sel.appendChild(o); })();
-    opts.forEach(opt => { const o=document.createElement('option'); o.value=opt; o.textContent=opt; sel.appendChild(o); });
-    sel.setAttribute('data-current', current);
-    // Preselect exact match if present, otherwise keep blank
-    if (current && Array.from(sel.options).some(o=>o.value===current)) sel.value = current; else sel.value='';
-    vEl.textContent = '';
+sel.setAttribute('data-current', (current || ''));
+          (function(){
+      const blank = document.createElement('option');
+      blank.value = ''; blank.textContent = ''; sel.appendChild(blank);
+      (opts||[]).forEach(function(opt){
+        const o = document.createElement('option');
+        o.value = String(opt).trim();
+        o.textContent = String(opt);
+        sel.appendChild(o);
+      });
+      const cur = (current||'').trim();
+      if (cur) {
+        const curNorm = cur.toLowerCase();
+        const hit = Array.from(sel.options).find(o => o.value.toLowerCase() === curNorm);
+        if (hit) sel.value = hit.value; else {
+          const extra = document.createElement('option'); extra.value = cur; extra.textContent = cur; sel.appendChild(extra); sel.value = cur;
+        }
+      } else {
+        sel.value = '';
+      }
+    })();
+          if (current) sel.value = current;
+          vEl.textContent = '';
           vEl.appendChild(sel);
         } else {
           vEl.setAttribute('contenteditable','true');
@@ -250,7 +293,7 @@ function collectFromPopup(){
     const ensureBlank = (root)=>{
       root.querySelectorAll('select[data-editor]').forEach(sel=>{
         // Ensure a leading blank option exists
-        const hasBlank = [...sel.options].some(o => o.value === '');
+        const hasBlank = [...sel /* FIXED: was .sel (typo), now handled above */.options].some(o => o.value === '');
         if(!hasBlank){
           const blank = document.createElement('option');
           blank.value = '';
