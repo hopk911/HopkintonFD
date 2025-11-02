@@ -87,3 +87,10 @@ dialog.modal:not([open]){display:none !important;}
 }
 .section-nav .chip { margin: 0; }
 
+
+
+/* --- iPad top clipping fix: ensure modal not cut off --- */
+.modal[open]{
+  top: calc(max(12px, env(safe-area-inset-top)) + 8px) !important;
+}
+
