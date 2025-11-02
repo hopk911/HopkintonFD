@@ -23,12 +23,7 @@
       if (looksTruncated(window.WEBAPP_URL)) {
         console.error('[config] WEBAPP_URL is missing/invalid. Set it via ?webapp=<url> or localStorage.WEBAPP_URL.');
       } 
-      window.addEventListener('DOMContentLoaded', ()=>{
-        const a=document.createElement('a');
-        a.href='#'; a.textContent='Config'; a.style.cssText='position:fixed;right:8px;bottom:8px;font:12px/1.2 system-ui;opacity:.4';
-        a.onclick=(e)=>{e.preventDefault();console.log('[config] WEBAPP_URL:', window.WEBAPP_URL)};
-        document.body.appendChild(a);
-      });
+      
     })();
 
     window.__BUILD__ = "popup-edit-2025-10-30T21:03:17";
@@ -89,9 +84,6 @@
   <!-- Cache-busted bundle and popup editor -->
 <script src="app.bundle.js"></script>
 <script src="app.js"></script>
-\1
-
-
 <script src="popup-edit.js"></script>
 <!-- Tiny hotfix: auto-enter editing for brand-new draft so empty fields are visible -->
 <script>
@@ -127,14 +119,14 @@ var modal = document.getElementById('recordModal');
 
 <script src="hfd-upload-injector.js"></script>
 <script>
-/* Remove any accidental stray '/1' text nodes appended to body */
+/* Remove any accidental stray '/1' text or elements (enhanced stray /1 scrub) */
 (function(){
   try{
     const scan = ()=>{
       document.querySelectorAll('body, body *').forEach(n=>{
         if(n.childNodes) {
           [...n.childNodes].forEach(c=>{
-            if(c.nodeType===3 && c.textContent && c.textContent.trim()==='/1'){
+            if((c.nodeType===3 && c.textContent && c.textContent.trim()==='/1') || (c.nodeType===1 && c.childNodes.length===1 && c.textContent && c.textContent.trim()==='/1')){
               c.parentNode.removeChild(c);
             }
           });
@@ -146,5 +138,23 @@ var modal = document.getElementById('recordModal');
   }catch(e){}
 })();
 </script>
+
+<script>
+// Toggle background scroll lock while modal is open
+(function(){
+  var modal = document.getElementById('recordModal');
+  if(!modal) return;
+  function sync(){ document.body.classList.toggle('modal-open', modal.hasAttribute('open')); }
+  // Observe attribute changes (covers programmatic open/close)
+  var obs = new MutationObserver(sync);
+  obs.observe(modal, { attributes:true, attributeFilter:['open'] });
+  // Also hook buttons if present
+  document.addEventListener('click', function(e){
+    if(e.target && (e.target.id==='btnCloseModal')){ setTimeout(sync, 0); }
+  }, true);
+  sync();
+})();
+</script>
+
 </body>
 </html>

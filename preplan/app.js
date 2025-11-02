@@ -29,7 +29,7 @@
   ];
 
   // ---- Modal field filters / helpers
-  const HIDE_IN_MODAL = ['timestamp','time stamp','stable id','stableid','business name','address','closest hydrant','knox box location'];
+  const HIDE_IN_MODAL = ['timestamp','time stamp','stable id','stableid','address','closest hydrant','knox box location'];
   const normalizeKey = k => String(k||'').toLowerCase().replace(/[:\s]+$/,'').replace(/[^a-z0-9]+/g,' ').trim();
   const isHiddenInModal = k => HIDE_IN_MODAL.includes(normalizeKey(k));
 
